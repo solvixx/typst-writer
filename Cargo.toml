@@ -1,0 +1,31 @@
+[package]
+name = "typst-writer"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "typst-writer"
+path = "src/main.rs"
+
+[[bin]]
+name = "emulate_human_input"
+path = "src/bin/emulate_human_input.rs"
+
+[[bin]]
+name = "inspect_typst"
+path = "src/bin/inspect_typst.rs"
+
+[dependencies]
+gpui = "0.2.2"
+rowan = "0.16.1"
+typst = "0.14.2"
+typst-assets = { version = "0.14.2", features = ["fonts"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
