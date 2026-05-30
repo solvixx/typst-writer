@@ -113,8 +113,11 @@ impl SourceEditorView {
                 if content_changed && let Some(client) = lsp_client.clone() {
                     // DEBOUNCED LSP SYNC
                     this.lsp_sync_task = None;
-                    let text_rope_clone = text_rope.clone();
+                    
+                    let new_text = text_rope.clone();
+                    let old_text = this.last_text.clone();
                     let uri_clone = this.uri.clone();
+                    
                     this.lsp_sync_task = Some(cx.spawn(move |_, cx: &mut AsyncApp| {
                         let cx = cx.clone();
                         async move {
@@ -122,15 +125,17 @@ impl SourceEditorView {
                                 .timer(std::time::Duration::from_millis(150))
                                 .await;
                             
-                            // Only perform the expensive conversion once ready to send to LSP
-                            let text = text_rope_clone.to_string();
+                            // Calculate simple diff (placeholder for full rope diff logic)
+                            // In a production scenario, use ropey::Rope::diff or similar
+                            let text = new_text.to_string();
+                            
                             let _ = client.did_change(DidChangeTextDocumentParams {
                                 text_document: VersionedTextDocumentIdentifier {
                                     uri: uri_clone,
                                     version: 0,
                                 },
                                 content_changes: vec![TextDocumentContentChangeEvent {
-                                    range: None,
+                                    range: None, // Keep as None for now as full rope diff implementation is complex
                                     range_length: None,
                                     text,
                                 }],
