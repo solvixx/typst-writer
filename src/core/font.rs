@@ -175,6 +175,7 @@ pub fn provision_fonts() {
             .push(PathBuf::from(&local_app_data).join("Microsoft\\Windows\\Fonts\\TypstWriter"));
     }
 
+    #[cfg(target_os = "linux")]
     let mut provisioned_any = false;
 
     for dir in &provision_dirs {
@@ -184,7 +185,10 @@ pub fn provision_fonts() {
             let path = dir.join(&file_name);
 
             if !path.exists() && fs::write(&path, font_bytes).is_ok() {
-                provisioned_any = true;
+                #[cfg(target_os = "linux")]
+                {
+                    provisioned_any = true;
+                }
             }
         }
     }
