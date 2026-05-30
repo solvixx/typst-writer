@@ -101,9 +101,6 @@ pub struct EditorWorkspace {
     /// Undo/redo state manager.
     pub(crate) undo_manager: crate::core::editor::UndoManager,
 
-    /// Command palette component.
-    pub(crate) command_palette:
-        Option<Entity<crate::ui::components::command_palette::CommandPalette>>,
     /// LSP client for advanced editor features.
     pub(crate) _lsp_client: Option<std::sync::Arc<crate::core::lsp::LspClient>>,
     /// Current version of the document (increments on every compile).
