@@ -6,7 +6,6 @@ use std::ops::Range;
 use std::str::FromStr;
 use typst::World;
 use typst::syntax::FileId;
-use url::Url;
 
 pub struct SourceEditorView {
     _workspace: WeakEntity<EditorWorkspace>,
@@ -20,6 +19,7 @@ pub struct SourceEditorView {
     last_cursor: usize,
     last_selection: Option<Range<usize>>,
     lsp_sync_task: Option<Task<()>>,
+    workspace_sync_task: Option<Task<()>>,
 
     // Dirty tracking
     pub saved_text: gpui_component::Rope,
@@ -167,6 +167,7 @@ impl SourceEditorView {
                     }));
                 }
 
+                // ── Synchronous Workspace State Update (Instantaneous) ───────────────────
                 if let Some(ws_handle) = workspace.upgrade() {
                     let uri_str = this.uri.to_string();
                     let url = url::Url::from_str(&uri_str).unwrap();
@@ -190,58 +191,7 @@ impl SourceEditorView {
                                 }
                             }
 
-                            if content_changed {
-                                // Find common prefix/suffix for minimal edit
-                                let root = ws
-                                    .world
-                                    .root_path
-                                    .clone()
-                                    .unwrap_or_else(|| std::path::PathBuf::from("."));
-                                let vpath = typst::syntax::VirtualPath::within_root(&path, &root)
-                                    .unwrap_or_else(|| {
-                                        typst::syntax::VirtualPath::new(path.file_name().unwrap())
-                                    });
-                                let id = FileId::new(None, vpath);
-
-                                let old_text = if let Ok(s) = ws.world.source(id) {
-                                    s.text().to_string()
-                                } else {
-                                    "".to_string()
-                                };
-
-                                if !rope_eq_str(&text_rope, &old_text) {
-                                    let (common_prefix, common_suffix) =
-                                        find_common_prefix_suffix(&old_text, &text_rope);
-
-                                    let range = common_prefix..(old_text.len() - common_suffix);
-                                    let replacement = text_rope
-                                        .slice(common_prefix..(text_rope.len() - common_suffix))
-                                        .to_string();
-                                    let url = Url::from_str(&format!(
-                                        "file://{}",
-                                        path.to_string_lossy()
-                                    ))
-                                    .unwrap();
-
-                                    ws.apply_editor_action_from_editor(
-                                        &url,
-                                        crate::core::editor::EditorAction::Edit {
-                                            range,
-                                            replacement,
-                                            new_cursor: cursor,
-                                            new_selection: if selection.is_empty() {
-                                                None
-                                            } else {
-                                                Some(selection.start..selection.end)
-                                            },
-                                        },
-                                        window,
-                                        cx,
-                                    );
-                                }
-                            }
-
-                            // Always update cursor metadata and refresh caret position for active workspace files
+                            // Always update cursor metadata and refresh caret position for active workspace files (instantaneous)
                             if ws.active_editor_path.as_ref() == Some(&path) {
                                 ws.update_cursor_node_info(cx);
                                 ws.refresh_caret_location(cx, !content_changed);
@@ -250,6 +200,80 @@ impl SourceEditorView {
                         });
                     })
                     .ok();
+                }
+
+                // ── Debounced Workspace Text Sync (State-of-the-Art, 60fps+ typing) ─────
+                if content_changed {
+                    this.workspace_sync_task = None;
+                    
+                    let new_text = text_rope.clone();
+                    let uri_clone = this.uri.clone();
+                    let workspace_clone = workspace.clone();
+                    let cursor_clone = cursor;
+                    let selection_clone = if selection.is_empty() {
+                        None
+                    } else {
+                        Some(selection.start..selection.end)
+                    };
+                    
+                    this.workspace_sync_task = Some(cx.spawn(move |this_weak: WeakEntity<SourceEditorView>, cx: &mut AsyncApp| {
+                        let mut cx = cx.clone();
+                        async move {
+                            cx.background_executor()
+                                .timer(std::time::Duration::from_millis(50))
+                                .await;
+                            
+                            this_weak.update(&mut cx, |this, cx| {
+                                if let Some(ws_handle) = workspace_clone.upgrade() {
+                                    cx.update_window(this.window_handle, |_, window, cx| {
+                                        ws_handle.update(cx, |ws, cx| {
+                                            let uri_str = uri_clone.to_string();
+                                            let url = url::Url::from_str(&uri_str).unwrap();
+                                            let path = url.to_file_path().unwrap_or_else(|_| {
+                                                std::path::PathBuf::from(url.path().to_string())
+                                            });
+
+                                            let root = ws
+                                                .world
+                                                .root_path
+                                                .clone()
+                                                .unwrap_or_else(|| std::path::PathBuf::from("."));
+                                            let vpath = typst::syntax::VirtualPath::within_root(&path, &root)
+                                                .unwrap_or_else(|| {
+                                                    typst::syntax::VirtualPath::new(path.file_name().unwrap())
+                                                });
+                                            let id = FileId::new(None, vpath);
+
+                                            if let Ok(s) = ws.world.source(id) {
+                                                let old_text = s.text();
+                                                if !rope_eq_str(&new_text, old_text) {
+                                                    let (common_prefix, common_suffix) =
+                                                        find_common_prefix_suffix(old_text, &new_text);
+
+                                                    let range = common_prefix..(old_text.len() - common_suffix);
+                                                    let replacement = new_text
+                                                        .slice(common_prefix..(new_text.len() - common_suffix))
+                                                        .to_string();
+
+                                                    ws.apply_editor_action_from_editor(
+                                                        &url,
+                                                        crate::core::editor::EditorAction::Edit {
+                                                            range,
+                                                            replacement,
+                                                            new_cursor: cursor_clone,
+                                                            new_selection: selection_clone,
+                                                        },
+                                                        window,
+                                                        cx,
+                                                    );
+                                                }
+                                            }
+                                        });
+                                    }).ok();
+                                }
+                            }).ok();
+                        }
+                    }));
                 }
             }
         })
@@ -265,6 +289,7 @@ impl SourceEditorView {
             last_cursor: 0,
             last_selection: None,
             lsp_sync_task: None,
+            workspace_sync_task: None,
             saved_text: initial_text_rope,
             is_dirty: false,
             last_synced_text: initial_text.clone(),
@@ -280,6 +305,7 @@ impl SourceEditorView {
     ) {
         // Clear pending sync task
         self.lsp_sync_task = None;
+        self.workspace_sync_task = None;
 
         // did_close the old file if LSP is active
         if let Some(client) = &self.lsp_client {
