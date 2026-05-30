@@ -1,4 +1,4 @@
-# 🖋️ Typst Writer (WYSIWYG Editor)
+# 🖋️ Typst Writer
 
 **Typst Writer** is a state-of-the-art, high-performance, and feature-rich cross-platform WYSIWYG IDE dedicated to the modern [Typst](https://typst.app) typesetting language. Built atop GPUI, it offers a breathtakingly fast, responsive, and ergonomic editing experience with real-time feedback.
 
