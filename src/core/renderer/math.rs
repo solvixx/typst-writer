@@ -1,6 +1,6 @@
-use typst::syntax::{Source, LinkedNode, SyntaxKind};
+use crate::core::editor::state::{EditorAction, EditorState};
 use std::ops::Range;
-use crate::core::editor::state::{EditorState, EditorAction};
+use typst::syntax::{LinkedNode, Source, SyntaxKind};
 
 fn is_structural_kind(kind: SyntaxKind) -> bool {
     matches!(
@@ -16,75 +16,92 @@ fn is_structural_kind(kind: SyntaxKind) -> bool {
 }
 
 fn is_placeholder(text: &str, range: Range<usize>) -> bool {
-    text.get(range).map(|s| s == "?" || s == "(?)").unwrap_or(false)
+    text.get(range)
+        .map(|s| s == "?" || s == "(?)")
+        .unwrap_or(false)
 }
 
 pub fn find_parent_math_structure_for_leaf<'a>(node: &LinkedNode<'a>) -> Option<LinkedNode<'a>> {
     let mut current = node.parent();
     while let Some(parent) = current {
         let k = parent.kind();
-        if k == SyntaxKind::MathFrac 
-            || k == SyntaxKind::MathRoot 
-            || k == SyntaxKind::MathDelimited 
+        if k == SyntaxKind::MathFrac
+            || k == SyntaxKind::MathRoot
+            || k == SyntaxKind::MathDelimited
             || k == SyntaxKind::FuncCall
-            || k == SyntaxKind::MathAttach {
-                return Some(parent.clone());
-            }
+            || k == SyntaxKind::MathAttach
+        {
+            return Some(parent.clone());
+        }
         current = parent.parent();
     }
     None
 }
 
-pub fn find_math_structure_ranges(source: &Source, offset: usize) -> Option<(Range<usize>, Range<usize>)> {
+pub fn find_math_structure_ranges(
+    source: &Source,
+    offset: usize,
+) -> Option<(Range<usize>, Range<usize>)> {
     let text = source.text();
     let root = source.root();
     let linked = LinkedNode::new(root);
-    
+
     let clamped = offset.min(text.len());
-    
+
     // Check both sides to resolve the leaf node accurately
     let mut leaf = linked.leaf_at(clamped, typst::syntax::Side::Before);
-    if (leaf.is_none() || leaf.as_ref().unwrap().kind() == SyntaxKind::RightParen || leaf.as_ref().unwrap().kind() == SyntaxKind::LeftParen)
-        && let Some(other_leaf) = linked.leaf_at(clamped, typst::syntax::Side::After) {
-            leaf = Some(other_leaf);
-        }
-    
+    if (leaf.is_none()
+        || leaf.as_ref().unwrap().kind() == SyntaxKind::RightParen
+        || leaf.as_ref().unwrap().kind() == SyntaxKind::LeftParen)
+        && let Some(other_leaf) = linked.leaf_at(clamped, typst::syntax::Side::After)
+    {
+        leaf = Some(other_leaf);
+    }
+
     let leaf = leaf?;
-    
+
     let mut current = Some(leaf.clone());
     while let Some(node) = current {
         // 1. Delimited group or function call argument list
         if node.kind() == SyntaxKind::Args
             && let Some(parent) = node.parent()
-                && parent.kind() == SyntaxKind::FuncCall {
-                    let mut current_arg_nodes = Vec::new();
-                    let mut args = Vec::new();
-                    for child in node.children() {
-                        let nk = child.kind();
-                        if nk == SyntaxKind::LeftParen || nk == SyntaxKind::RightParen || nk == SyntaxKind::Comma || nk == SyntaxKind::Semicolon {
-                            if !current_arg_nodes.is_empty() {
-                                args.push(current_arg_nodes.clone());
-                                current_arg_nodes.clear();
-                            }
-                        } else {
-                            current_arg_nodes.push(child);
-                        }
-                    }
+            && parent.kind() == SyntaxKind::FuncCall
+        {
+            let mut current_arg_nodes = Vec::new();
+            let mut args = Vec::new();
+            for child in node.children() {
+                let nk = child.kind();
+                if nk == SyntaxKind::LeftParen
+                    || nk == SyntaxKind::RightParen
+                    || nk == SyntaxKind::Comma
+                    || nk == SyntaxKind::Semicolon
+                {
                     if !current_arg_nodes.is_empty() {
-                        args.push(current_arg_nodes);
+                        args.push(current_arg_nodes.clone());
+                        current_arg_nodes.clear();
                     }
-                    for arg_nodes in args {
-                        let first = arg_nodes.iter().find(|n| n.kind() != SyntaxKind::Space);
-                        let last = arg_nodes.iter().rev().find(|n| n.kind() != SyntaxKind::Space);
-                        if let (Some(f), Some(l)) = (first, last) {
-                            let r = f.range().start..l.range().end;
-                            if r.contains(&offset) || (offset == r.end && !r.is_empty()) {
-                                return Some((parent.range(), r));
-                            }
-                        }
+                } else {
+                    current_arg_nodes.push(child);
+                }
+            }
+            if !current_arg_nodes.is_empty() {
+                args.push(current_arg_nodes);
+            }
+            for arg_nodes in args {
+                let first = arg_nodes.iter().find(|n| n.kind() != SyntaxKind::Space);
+                let last = arg_nodes
+                    .iter()
+                    .rev()
+                    .find(|n| n.kind() != SyntaxKind::Space);
+                if let (Some(f), Some(l)) = (first, last) {
+                    let r = f.range().start..l.range().end;
+                    if r.contains(&offset) || (offset == r.end && !r.is_empty()) {
+                        return Some((parent.range(), r));
                     }
                 }
-        
+            }
+        }
+
         // 2. MathAttach attachment
         let mut current_node = node.clone();
         while let Some(parent) = current_node.parent() {
@@ -92,7 +109,9 @@ pub fn find_math_structure_ranges(source: &Source, offset: usize) -> Option<(Ran
                 // Find which child of MathAttach we are in (or under)
                 let mut top_child = current_node;
                 while let Some(p) = top_child.parent() {
-                    if p.kind() == SyntaxKind::MathAttach { break; }
+                    if p.kind() == SyntaxKind::MathAttach {
+                        break;
+                    }
                     top_child = p.clone();
                 }
 
@@ -105,29 +124,39 @@ pub fn find_math_structure_ranges(source: &Source, offset: usize) -> Option<(Ran
                         break;
                     }
                 }
-                if let Some(op) = prev.filter(|o| o.kind() == SyntaxKind::Underscore || o.kind() == SyntaxKind::Hat) {
+                if let Some(op) = prev
+                    .filter(|o| o.kind() == SyntaxKind::Underscore || o.kind() == SyntaxKind::Hat)
+                {
                     let mut inner_start = top_child.range().start;
                     let mut inner_end = top_child.range().end;
 
                     // Un-nest Math if it's just a wrapper
-                    if let Some(inner) = Some(&top_child).filter(|n| n.kind() == SyntaxKind::Math && n.children().count() == 1).and_then(|n| n.children().next()) {
+                    if let Some(inner) = Some(&top_child)
+                        .filter(|n| n.kind() == SyntaxKind::Math && n.children().count() == 1)
+                        .and_then(|n| n.children().next())
+                    {
                         inner_start = inner.range().start;
                         inner_end = inner.range().end;
                     }
 
                     // Handle parentheses wrapping
                     if inner_end > inner_start + 1
-                        && text.get(inner_start..inner_start+1) == Some("(") 
-                        && text.get(inner_end-1..inner_end) == Some(")") {
-                            inner_start += 1;
-                            inner_end -= 1;
-                        }
+                        && text.get(inner_start..inner_start + 1) == Some("(")
+                        && text.get(inner_end - 1..inner_end) == Some(")")
+                    {
+                        inner_start += 1;
+                        inner_end -= 1;
+                    }
 
-                    return Some((op.range().start..top_child.range().end, inner_start..inner_end));
+                    return Some((
+                        op.range().start..top_child.range().end,
+                        inner_start..inner_end,
+                    ));
                 }
 
                 // CASE B: We are at the operator itself (_ or ^)
-                if top_child.kind() == SyntaxKind::Underscore || top_child.kind() == SyntaxKind::Hat {
+                if top_child.kind() == SyntaxKind::Underscore || top_child.kind() == SyntaxKind::Hat
+                {
                     let mut next = top_child.next_sibling();
                     while let Some(sib) = &next {
                         if sib.kind() == SyntaxKind::Space {
@@ -139,20 +168,27 @@ pub fn find_math_structure_ranges(source: &Source, offset: usize) -> Option<(Ran
                     if let Some(val) = next {
                         let mut inner_start = val.range().start;
                         let mut inner_end = val.range().end;
-                        
-                        if let Some(inner) = Some(&val).filter(|n| n.kind() == SyntaxKind::Math && n.children().count() == 1).and_then(|n| n.children().next()) {
-                             inner_start = inner.range().start;
-                             inner_end = inner.range().end;
+
+                        if let Some(inner) = Some(&val)
+                            .filter(|n| n.kind() == SyntaxKind::Math && n.children().count() == 1)
+                            .and_then(|n| n.children().next())
+                        {
+                            inner_start = inner.range().start;
+                            inner_end = inner.range().end;
                         }
 
                         if inner_end > inner_start + 1
-                            && text.get(inner_start..inner_start+1) == Some("(") 
-                            && text.get(inner_end-1..inner_end) == Some(")") {
-                                inner_start += 1;
-                                inner_end -= 1;
-                            }
+                            && text.get(inner_start..inner_start + 1) == Some("(")
+                            && text.get(inner_end - 1..inner_end) == Some(")")
+                        {
+                            inner_start += 1;
+                            inner_end -= 1;
+                        }
 
-                        return Some((top_child.range().start..val.range().end, inner_start..inner_end));
+                        return Some((
+                            top_child.range().start..val.range().end,
+                            inner_start..inner_end,
+                        ));
                     }
                 }
 
@@ -163,37 +199,46 @@ pub fn find_math_structure_ranges(source: &Source, offset: usize) -> Option<(Ran
             }
             current_node = parent.clone();
         }
-        
+
         // 3. Fraction arms
         if node.kind() == SyntaxKind::MathFrac {
             for child in node.children() {
-                if child.kind() != SyntaxKind::Slash && child.kind() != SyntaxKind::Space
-                    && (child.range().contains(&offset) || (offset == child.range().end && !child.range().is_empty())) {
-                        return Some((node.range(), child.range()));
-                    }
+                if child.kind() != SyntaxKind::Slash
+                    && child.kind() != SyntaxKind::Space
+                    && (child.range().contains(&offset)
+                        || (offset == child.range().end && !child.range().is_empty()))
+                {
+                    return Some((node.range(), child.range()));
+                }
             }
         }
-        
+
         // 4. Delimited math groups
         if node.kind() == SyntaxKind::MathDelimited {
             for child in node.children() {
-                if child.kind() != SyntaxKind::LeftParen && child.kind() != SyntaxKind::RightParen
-                    && (child.range().contains(&offset) || (offset == child.range().end && !child.range().is_empty())) {
-                        return Some((node.range(), child.range()));
-                    }
+                if child.kind() != SyntaxKind::LeftParen
+                    && child.kind() != SyntaxKind::RightParen
+                    && (child.range().contains(&offset)
+                        || (offset == child.range().end && !child.range().is_empty()))
+                {
+                    return Some((node.range(), child.range()));
+                }
             }
         }
 
         // 5. MathRoot radicand
         if node.kind() == SyntaxKind::MathRoot {
             for child in node.children() {
-                if child.kind() != SyntaxKind::Root && child.kind() != SyntaxKind::Space
-                    && (child.range().contains(&offset) || (offset == child.range().end && !child.range().is_empty())) {
-                        return Some((node.range(), child.range()));
-                    }
+                if child.kind() != SyntaxKind::Root
+                    && child.kind() != SyntaxKind::Space
+                    && (child.range().contains(&offset)
+                        || (offset == child.range().end && !child.range().is_empty()))
+                {
+                    return Some((node.range(), child.range()));
+                }
             }
         }
-        
+
         current = node.parent().cloned();
     }
     None
@@ -203,7 +248,7 @@ pub fn walk_ast(source: &Source, cursor: usize, direction: &str) -> Option<usize
     let text = source.text();
     let root = source.root();
     let linked = LinkedNode::new(root);
-    
+
     if direction == "right" {
         let mut node = linked.leaf_at(cursor, typst::syntax::Side::After);
         while let Some(current) = node {
@@ -213,7 +258,11 @@ pub fn walk_ast(source: &Source, cursor: usize, direction: &str) -> Option<usize
                     return Some(range.start);
                 }
                 if cursor < range.end {
-                    let next_idx = text[cursor..].char_indices().nth(1).map(|(i, _)| cursor + i).unwrap_or(range.end);
+                    let next_idx = text[cursor..]
+                        .char_indices()
+                        .nth(1)
+                        .map(|(i, _)| cursor + i)
+                        .unwrap_or(range.end);
                     return Some(next_idx);
                 }
             }
@@ -229,7 +278,11 @@ pub fn walk_ast(source: &Source, cursor: usize, direction: &str) -> Option<usize
                     return Some(range.end);
                 }
                 if cursor > range.start {
-                    let prev_idx = text[..cursor].char_indices().next_back().map(|(i, _)| i).unwrap_or(range.start);
+                    let prev_idx = text[..cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(range.start);
                     return Some(prev_idx);
                 }
             }
@@ -241,8 +294,10 @@ pub fn walk_ast(source: &Source, cursor: usize, direction: &str) -> Option<usize
 
 pub fn is_semantic(node: &LinkedNode) -> bool {
     let kind = node.kind();
-    if node.text() == "?" { return true; }
-    
+    if node.text() == "?" {
+        return true;
+    }
+
     !matches!(
         kind,
         SyntaxKind::Space
@@ -286,7 +341,9 @@ pub fn handle_math_deletion(
 ) -> Option<EditorAction> {
     let text = source.text();
     let is_backspace = key == "backspace";
-    let had_selection = state.selection.clone()
+    let had_selection = state
+        .selection
+        .clone()
         .filter(|r| r.start != r.end)
         .map(|r| if r.start < r.end { r } else { r.end..r.start });
 
@@ -296,7 +353,10 @@ pub fn handle_math_deletion(
     if let Some(sel) = had_selection {
         // 1. Expand incomplete selection first
         if let Some(expanded) = expand_incomplete_selection(source, sel.start, sel.end) {
-            return Some(EditorAction::Select { range: expanded, reversed: true });
+            return Some(EditorAction::Select {
+                range: expanded,
+                reversed: true,
+            });
         }
 
         // 2. Principle 3: Atomic Removal (Whole structures or identified arms)
@@ -310,7 +370,11 @@ pub fn handle_math_deletion(
         }
 
         let linked = LinkedNode::new(source.root());
-        if linked.leaf_at(sel.start, typst::syntax::Side::After).and_then(|leaf| find_parent_math_structure_for_leaf(&leaf)).is_some_and(|p| p.range() == sel) {
+        if linked
+            .leaf_at(sel.start, typst::syntax::Side::After)
+            .and_then(|leaf| find_parent_math_structure_for_leaf(&leaf))
+            .is_some_and(|p| p.range() == sel)
+        {
             return Some(EditorAction::Edit {
                 range: sel.clone(),
                 replacement: String::new(),
@@ -320,7 +384,11 @@ pub fn handle_math_deletion(
         }
 
         // 3. Principle 3: Atomic Removal (Placeholders)
-        if let Some(full) = Some(sel.clone()).filter(|s| is_placeholder(text, s.clone())).and_then(|s| find_math_structure_ranges(source, s.start + 1).filter(|(_, i)| i == &s)).map(|(f, _)| f) {
+        if let Some(full) = Some(sel.clone())
+            .filter(|s| is_placeholder(text, s.clone()))
+            .and_then(|s| find_math_structure_ranges(source, s.start + 1).filter(|(_, i)| i == &s))
+            .map(|(f, _)| f)
+        {
             return Some(EditorAction::Edit {
                 range: full.clone(),
                 replacement: String::new(),
@@ -331,7 +399,9 @@ pub fn handle_math_deletion(
 
         // 4. Principle 2 (Selection-based): Restoration of nested structures
         // e.g. deleting `2` in `(2)` -> `(?)`
-        if find_math_structure_ranges(source, sel.start + 1).is_some_and(|(_, i)| i == sel && !is_placeholder(text, sel.clone())) {
+        if find_math_structure_ranges(source, sel.start + 1)
+            .is_some_and(|(_, i)| i == sel && !is_placeholder(text, sel.clone()))
+        {
             return Some(EditorAction::Edit {
                 range: sel.clone(),
                 replacement: "?".to_string(),
@@ -380,17 +450,29 @@ pub fn handle_math_deletion(
     // Otherwise, if there is at most a single space, we act on the adjacent non-whitespace character.
     // For backspace, we act before the space (at start_spaces).
     // For delete, we act after the space (at end_spaces).
-    let active_pos = if is_backspace { start_spaces } else { end_spaces };
+    let active_pos = if is_backspace {
+        start_spaces
+    } else {
+        end_spaces
+    };
 
     let target_range = if is_backspace {
-        if active_pos == 0 { return None; }
+        if active_pos == 0 {
+            return None;
+        }
         let mut prev_char_len = 1;
-        if let Some(prev_idx) = text[..active_pos].char_indices().map(|(idx, _)| idx).next_back() {
+        if let Some(prev_idx) = text[..active_pos]
+            .char_indices()
+            .map(|(idx, _)| idx)
+            .next_back()
+        {
             prev_char_len = active_pos - prev_idx;
         }
         (active_pos - prev_char_len)..active_pos
     } else {
-        if active_pos >= text.len() { return None; }
+        if active_pos >= text.len() {
+            return None;
+        }
         let mut next_char_len = 1;
         if let Some(next_char) = text[active_pos..].chars().next() {
             next_char_len = next_char.len_utf8();
@@ -424,41 +506,77 @@ pub fn handle_math_deletion(
 
     // 1. Principle 1: Selection Upgrade for placeholders
     if is_placeholder(text, target_range.clone()) {
-        if let Some(full) = find_math_structure_ranges(source, target_range.end).filter(|(_, i)| i == &target_range).map(|(f, _)| f) {
-            return Some(EditorAction::Select { range: full, reversed: true });
+        if let Some(full) = find_math_structure_ranges(source, target_range.end)
+            .filter(|(_, i)| i == &target_range)
+            .map(|(f, _)| f)
+        {
+            return Some(EditorAction::Select {
+                range: full,
+                reversed: true,
+            });
         }
         if let Some(parent) = find_parent_math_structure_for_leaf(&leaf) {
-             return Some(EditorAction::Select { range: parent.range(), reversed: true });
+            return Some(EditorAction::Select {
+                range: parent.range(),
+                reversed: true,
+            });
         }
     }
 
     // 1.5 Principle 1 (Inverse): Selection Upgrade for placeholders (trailing edge)
     if !is_backspace && active_pos > 0 {
         let mut prev_char_len = 1;
-        if let Some(prev_idx) = text[..active_pos].char_indices().map(|(idx, _)| idx).next_back() {
+        if let Some(prev_idx) = text[..active_pos]
+            .char_indices()
+            .map(|(idx, _)| idx)
+            .next_back()
+        {
             prev_char_len = active_pos - prev_idx;
         }
         let prev_range = (active_pos - prev_char_len)..active_pos;
-        if let Some(full) = Some(prev_range.clone()).filter(|pr| is_placeholder(text, pr.clone())).and_then(|pr| find_math_structure_ranges(source, active_pos).filter(|(_, i)| i == &pr)).map(|(f, _)| f) {
-            return Some(EditorAction::Select { range: full, reversed: true });
+        if let Some(full) = Some(prev_range.clone())
+            .filter(|pr| is_placeholder(text, pr.clone()))
+            .and_then(|pr| find_math_structure_ranges(source, active_pos).filter(|(_, i)| i == &pr))
+            .map(|(f, _)| f)
+        {
+            return Some(EditorAction::Select {
+                range: full,
+                reversed: true,
+            });
         }
     }
 
     // 2. Principle 1: Selection Upgrade for structural delimiters and operators
     if is_structural_kind(leaf.kind()) {
-        if let Some((full, _inner)) = find_math_structure_ranges(source, if is_backspace { active_pos } else { active_pos + 1 }) {
-             return Some(EditorAction::Select { range: full, reversed: true });
+        if let Some((full, _inner)) = find_math_structure_ranges(
+            source,
+            if is_backspace {
+                active_pos
+            } else {
+                active_pos + 1
+            },
+        ) {
+            return Some(EditorAction::Select {
+                range: full,
+                reversed: true,
+            });
         }
         if let Some(parent) = find_parent_math_structure_for_leaf(&leaf) {
             if leaf.kind() == SyntaxKind::LeftParen {
                 let inner_start = parent.range().start + 1;
                 let mut inner_end = parent.range().end;
-                if inner_end > inner_start && text.get(inner_end-1..inner_end) == Some(")") {
+                if inner_end > inner_start && text.get(inner_end - 1..inner_end) == Some(")") {
                     inner_end -= 1;
                 }
-                return Some(EditorAction::Select { range: inner_start..inner_end, reversed: true });
+                return Some(EditorAction::Select {
+                    range: inner_start..inner_end,
+                    reversed: true,
+                });
             }
-            return Some(EditorAction::Select { range: parent.range(), reversed: true });
+            return Some(EditorAction::Select {
+                range: parent.range(),
+                reversed: true,
+            });
         }
     }
 
@@ -484,10 +602,19 @@ pub fn handle_math_deletion(
 
     // 4. Principle 1: Selection Upgrade for atomic IDs and structure edges
     if leaf.kind() == SyntaxKind::MathIdent {
-        return Some(EditorAction::Select { range: leaf.range(), reversed: true });
+        return Some(EditorAction::Select {
+            range: leaf.range(),
+            reversed: true,
+        });
     }
-    if let Some(parent) = find_parent_math_structure_for_leaf(&leaf).filter(|p| (is_backspace && p.range().end == active_pos) || (!is_backspace && p.range().start == active_pos)) {
-        return Some(EditorAction::Select { range: parent.range(), reversed: true });
+    if let Some(parent) = find_parent_math_structure_for_leaf(&leaf).filter(|p| {
+        (is_backspace && p.range().end == active_pos)
+            || (!is_backspace && p.range().start == active_pos)
+    }) {
+        return Some(EditorAction::Select {
+            range: parent.range(),
+            reversed: true,
+        });
     }
 
     None
@@ -500,7 +627,7 @@ pub fn expand_incomplete_selection(
 ) -> Option<Range<usize>> {
     let root = source.root();
     let linked = LinkedNode::new(root);
-    
+
     let mut current_offset = sel_start;
     let mut expanded_start = sel_start;
     let mut expanded_end = sel_end;
@@ -509,7 +636,7 @@ pub fn expand_incomplete_selection(
         if let Some(leaf) = linked.leaf_at(current_offset, typst::syntax::Side::After) {
             let mut unit_start = leaf.range().start;
             let mut unit_end = leaf.range().end;
-            
+
             match leaf.kind() {
                 SyntaxKind::MathIdent => {
                     if let Some(parent) = leaf.parent() {
@@ -517,7 +644,9 @@ pub fn expand_incomplete_selection(
                             let mut is_base = true;
                             let mut prev = leaf.prev_sibling();
                             while let Some(sib) = prev {
-                                if sib.kind() == SyntaxKind::Underscore || sib.kind() == SyntaxKind::Hat {
+                                if sib.kind() == SyntaxKind::Underscore
+                                    || sib.kind() == SyntaxKind::Hat
+                                {
                                     is_base = false;
                                     break;
                                 }
@@ -527,63 +656,89 @@ pub fn expand_incomplete_selection(
                                 unit_start = parent.range().start;
                                 unit_end = parent.range().end;
                             }
-                        } else if parent.kind() == SyntaxKind::FuncCall && parent.children().next().is_some_and(|fc| fc.range() == leaf.range()) {
+                        } else if parent.kind() == SyntaxKind::FuncCall
+                            && parent
+                                .children()
+                                .next()
+                                .is_some_and(|fc| fc.range() == leaf.range())
+                        {
                             unit_start = parent.range().start;
                             unit_end = parent.range().end;
                         }
                     }
                 }
                 SyntaxKind::Underscore | SyntaxKind::Hat => {
-                    if let Some(val) = leaf.parent().filter(|p| p.kind() == SyntaxKind::MathAttach).and_then(|_p| {
-                        let mut next = leaf.next_sibling();
-                        while let Some(sib) = &next {
-                            if sib.kind() == SyntaxKind::Space || sib.kind() == SyntaxKind::Error {
-                                next = sib.next_sibling();
-                            } else {
-                                break;
+                    if let Some(val) = leaf
+                        .parent()
+                        .filter(|p| p.kind() == SyntaxKind::MathAttach)
+                        .and_then(|_p| {
+                            let mut next = leaf.next_sibling();
+                            while let Some(sib) = &next {
+                                if sib.kind() == SyntaxKind::Space
+                                    || sib.kind() == SyntaxKind::Error
+                                {
+                                    next = sib.next_sibling();
+                                } else {
+                                    break;
+                                }
                             }
-                        }
-                        next
-                    }) {
+                            next
+                        })
+                    {
                         unit_end = val.range().end;
                     }
                 }
-                SyntaxKind::LeftParen | SyntaxKind::RightParen | SyntaxKind::LeftBracket | SyntaxKind::RightBracket | SyntaxKind::LeftBrace | SyntaxKind::RightBrace => {
-                    if let Some(parent) = leaf.parent().filter(|p| p.kind() == SyntaxKind::MathDelimited || p.kind() == SyntaxKind::Args) {
+                SyntaxKind::LeftParen
+                | SyntaxKind::RightParen
+                | SyntaxKind::LeftBracket
+                | SyntaxKind::RightBracket
+                | SyntaxKind::LeftBrace
+                | SyntaxKind::RightBrace => {
+                    if let Some(parent) = leaf.parent().filter(|p| {
+                        p.kind() == SyntaxKind::MathDelimited || p.kind() == SyntaxKind::Args
+                    }) {
                         unit_start = parent.range().start;
                         unit_end = parent.range().end;
                     }
                 }
                 SyntaxKind::Slash => {
-                    if let Some(parent) = leaf.parent().filter(|p| p.kind() == SyntaxKind::MathFrac) {
+                    if let Some(parent) = leaf.parent().filter(|p| p.kind() == SyntaxKind::MathFrac)
+                    {
                         unit_start = parent.range().start;
                         unit_end = parent.range().end;
                     }
                 }
                 SyntaxKind::Root => {
-                    if let Some(parent) = leaf.parent().filter(|p| p.kind() == SyntaxKind::MathRoot) {
+                    if let Some(parent) = leaf.parent().filter(|p| p.kind() == SyntaxKind::MathRoot)
+                    {
                         unit_start = parent.range().start;
                         unit_end = parent.range().end;
                     }
                 }
                 SyntaxKind::Comma | SyntaxKind::Semicolon => {
-                    if let Some(parent) = leaf.parent().filter(|p| p.kind() == SyntaxKind::Args || p.kind() == SyntaxKind::MathRoot) {
+                    if let Some(parent) = leaf.parent().filter(|p| {
+                        p.kind() == SyntaxKind::Args || p.kind() == SyntaxKind::MathRoot
+                    }) {
                         unit_start = parent.range().start;
                         unit_end = parent.range().end;
                     }
                 }
                 _ => {}
             }
-            
-            if unit_start < expanded_start { expanded_start = unit_start; }
-            if unit_end > expanded_end { expanded_end = unit_end; }
-            
+
+            if unit_start < expanded_start {
+                expanded_start = unit_start;
+            }
+            if unit_end > expanded_end {
+                expanded_end = unit_end;
+            }
+
             current_offset = leaf.range().end.max(current_offset + 1);
         } else {
             break;
         }
     }
-    
+
     let result = expanded_start..expanded_end;
     if result != (sel_start..sel_end) {
         Some(result)

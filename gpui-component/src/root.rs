@@ -7,9 +7,9 @@ use crate::{
     window_border,
 };
 use gpui::{
-    AnyElement, AnyView, App, AppContext, Context, DefiniteLength, Entity, FocusHandle, InteractiveElement,
-    IntoElement, KeyBinding, ParentElement as _, Render, Styled, Window, actions, canvas, div,
-    prelude::FluentBuilder as _,
+    AnyElement, AnyView, App, AppContext, Context, DefiniteLength, Entity, FocusHandle,
+    InteractiveElement, IntoElement, KeyBinding, ParentElement as _, Render, Styled, Window,
+    actions, canvas, div, prelude::FluentBuilder as _,
 };
 use std::{any::TypeId, rc::Rc};
 
@@ -399,9 +399,7 @@ impl Root {
         window.focus_prev();
     }
 
-    fn render_notification_layer_direct(
-        &self,
-    ) -> Option<AnyElement> {
+    fn render_notification_layer_direct(&self) -> Option<AnyElement> {
         let active_sheet_placement = self.active_sheet.clone().map(|d| d.placement);
 
         let (mt, mr) = match active_sheet_placement {
@@ -437,26 +435,27 @@ impl Root {
             let size = sheet.size;
 
             return Some(
-                div().relative().child(sheet).child(
-                    canvas(
-                        move |_, _, cx| root_entity.update(cx, |r, _| r.sheet_size = Some(size)),
-                        |_, _, _, _| {},
+                div()
+                    .relative()
+                    .child(sheet)
+                    .child(
+                        canvas(
+                            move |_, _, cx| {
+                                root_entity.update(cx, |r, _| r.sheet_size = Some(size))
+                            },
+                            |_, _, _, _| {},
+                        )
+                        .absolute()
+                        .size_full(),
                     )
-                    .absolute()
-                    .size_full(),
-                )
-                .into_any_element(),
+                    .into_any_element(),
             );
         }
 
         None
     }
 
-    fn render_dialog_layer_direct(
-        &self,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Option<AnyElement> {
+    fn render_dialog_layer_direct(&self, window: &mut Window, cx: &mut App) -> Option<AnyElement> {
         let active_dialogs = self.active_dialogs.clone();
 
         if active_dialogs.is_empty() {

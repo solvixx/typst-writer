@@ -878,7 +878,12 @@ impl InputState {
     }
 
     /// Directly set the selection range (UTF-8 byte offsets) and its reversal status.
-    pub fn set_selected_range(&mut self, selection: Selection, reversed: bool, cx: &mut Context<Self>) {
+    pub fn set_selected_range(
+        &mut self,
+        selection: Selection,
+        reversed: bool,
+        cx: &mut Context<Self>,
+    ) {
         self.clear_inline_completion(cx);
         self.selected_range = selection;
         self.selection_reversed = reversed;

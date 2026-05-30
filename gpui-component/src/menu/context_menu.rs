@@ -7,8 +7,8 @@ use gpui::{
     anchored, deferred, div, prelude::FluentBuilder, px,
 };
 
-use crate::menu::PopupMenu;
 use crate::ActiveTheme;
+use crate::menu::PopupMenu;
 
 /// A extension trait for adding a context menu to an element.
 pub trait ContextMenuExt: ParentElement + Styled {
@@ -190,9 +190,11 @@ impl<E: ParentElement + Styled + IntoElement + 'static> Element for ContextMenu<
 
                                                     this.child(
                                                         div()
-                                                            .font_family(cx.theme().font_family.clone())
+                                                            .font_family(
+                                                                cx.theme().font_family.clone(),
+                                                            )
                                                             .cursor_default()
-                                                            .child(menu.clone())
+                                                            .child(menu.clone()),
                                                     )
                                                 }),
                                         ),

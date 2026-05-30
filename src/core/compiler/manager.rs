@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use std::ops::Range;
-use gpui::{AsyncApp, Task, WeakEntity};
-use typst::layout::PagedDocument;
 use crate::core::compiler::SimpleWorld;
+use gpui::{AsyncApp, Task, WeakEntity};
+use std::ops::Range;
+use std::sync::Arc;
+use typst::layout::PagedDocument;
 
 /// Manages background compilation of Typst documents.
 pub struct CompilerManager {
@@ -20,7 +20,7 @@ pub struct CompilerManager {
     pub structural_ranges: Vec<Range<usize>>,
     /// Hash of the concatenated structural region bytes.
     pub structural_hash: u64,
-    
+
     /// Handle to the active background compilation task.
     compilation_task: Option<Task<()>>,
 }
@@ -41,11 +41,13 @@ impl CompilerManager {
 
     /// Triggers a background compilation.
     pub fn compile<V: 'static>(
-        &mut self, 
-        world: SimpleWorld, 
+        &mut self,
+        world: SimpleWorld,
         view_weak: WeakEntity<V>,
         cx: &mut gpui::Context<V>,
-        on_success: impl FnOnce(&mut V, Arc<PagedDocument>, usize, &mut gpui::Context<V>) + 'static + Send,
+        on_success: impl FnOnce(&mut V, Arc<PagedDocument>, usize, &mut gpui::Context<V>)
+        + 'static
+        + Send,
     ) {
         if self.is_compiling {
             self.needs_recompile = true;
@@ -56,7 +58,7 @@ impl CompilerManager {
         self.needs_recompile = false;
 
         let world_clone = world.clone();
-        
+
         self.compilation_task = Some(cx.spawn(move |_, cx: &mut AsyncApp| {
             let mut cx = cx.clone();
             async move {
@@ -64,17 +66,19 @@ impl CompilerManager {
                 let result = typst::compile::<PagedDocument>(&world_clone);
                 let _duration = start.elapsed();
 
-                view_weak.update(&mut cx, |view, cx| {
-                    match result.output {
-                        Ok(doc) => {
-                            let doc_arc = Arc::new(doc);
-                            on_success(view, doc_arc, result.warnings.len(), cx);
+                view_weak
+                    .update(&mut cx, |view, cx| {
+                        match result.output {
+                            Ok(doc) => {
+                                let doc_arc = Arc::new(doc);
+                                on_success(view, doc_arc, result.warnings.len(), cx);
+                            }
+                            Err(_diags) => {
+                                // Diagnostics are handled by the caller or specialized callback
+                            }
                         }
-                        Err(_diags) => {
-                            // Diagnostics are handled by the caller or specialized callback
-                        }
-                    }
-                }).ok();
+                    })
+                    .ok();
             }
         }));
     }
@@ -95,7 +99,7 @@ impl CompilerManager {
 /// node: set rules, show rules, imports, includes, top-level let bindings, and
 /// `context` expressions.
 pub fn extract_structural_ranges(text: &str) -> Vec<Range<usize>> {
-    use typst::syntax::{parse, LinkedNode, SyntaxKind};
+    use typst::syntax::{LinkedNode, SyntaxKind, parse};
     let root = parse(text);
     let linked = LinkedNode::new(&root);
     let mut ranges = Vec::new();
@@ -134,7 +138,7 @@ pub fn extract_structural_ranges(text: &str) -> Vec<Range<usize>> {
 /// Simple FNV-1a hash over the bytes of all structural regions.
 pub fn hash_text_regions(text: &str, ranges: &[Range<usize>]) -> u64 {
     const FNV_OFFSET: u64 = 14_695_981_039_346_656_037;
-    const FNV_PRIME: u64  = 1_099_511_628_211;
+    const FNV_PRIME: u64 = 1_099_511_628_211;
     let mut hash = FNV_OFFSET;
     for range in ranges {
         if let Some(region) = text.get(range.clone()) {

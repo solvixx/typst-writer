@@ -38,12 +38,12 @@ pub enum EditorAction {
 pub fn map_offset_between_texts(current: &str, compiled: &str, offset: usize) -> usize {
     let current_len = current.len();
     let compiled_len = compiled.len();
-    
+
     // Find longest common prefix
     let mut prefix_len = 0;
     let current_chars: Vec<char> = current.chars().collect();
     let compiled_chars: Vec<char> = compiled.chars().collect();
-    
+
     while prefix_len < current_chars.len() && prefix_len < compiled_chars.len() {
         if current_chars[prefix_len] == compiled_chars[prefix_len] {
             prefix_len += 1;
@@ -51,17 +51,22 @@ pub fn map_offset_between_texts(current: &str, compiled: &str, offset: usize) ->
             break;
         }
     }
-    
+
     // Convert character prefix length back to byte offset
-    let prefix_byte = current_chars[..prefix_len].iter().map(|c| c.len_utf8()).sum::<usize>();
-    
+    let prefix_byte = current_chars[..prefix_len]
+        .iter()
+        .map(|c| c.len_utf8())
+        .sum::<usize>();
+
     if offset <= prefix_byte {
         return offset;
     }
-    
+
     // Find longest common suffix (not overlapping with prefix)
     let mut suffix_len = 0;
-    while suffix_len < current_chars.len() - prefix_len && suffix_len < compiled_chars.len() - prefix_len {
+    while suffix_len < current_chars.len() - prefix_len
+        && suffix_len < compiled_chars.len() - prefix_len
+    {
         let cur_idx = current_chars.len() - 1 - suffix_len;
         let comp_idx = compiled_chars.len() - 1 - suffix_len;
         if current_chars[cur_idx] == compiled_chars[comp_idx] {
@@ -70,19 +75,25 @@ pub fn map_offset_between_texts(current: &str, compiled: &str, offset: usize) ->
             break;
         }
     }
-    
-    let suffix_byte_cur = current_chars[current_chars.len() - suffix_len..].iter().map(|c| c.len_utf8()).sum::<usize>();
-    let suffix_byte_comp = compiled_chars[compiled_chars.len() - suffix_len..].iter().map(|c| c.len_utf8()).sum::<usize>();
-    
+
+    let suffix_byte_cur = current_chars[current_chars.len() - suffix_len..]
+        .iter()
+        .map(|c| c.len_utf8())
+        .sum::<usize>();
+    let suffix_byte_comp = compiled_chars[compiled_chars.len() - suffix_len..]
+        .iter()
+        .map(|c| c.len_utf8())
+        .sum::<usize>();
+
     if offset >= current_len - suffix_byte_cur {
         let diff_from_end = current_len - offset;
         return compiled_len.saturating_sub(diff_from_end);
     }
-    
+
     // Inside the edit zone, interpolate or snap to prefix_byte
     let edit_len_cur = (current_len - suffix_byte_cur).saturating_sub(prefix_byte);
     let edit_len_comp = (compiled_len - suffix_byte_comp).saturating_sub(prefix_byte);
-    
+
     if edit_len_cur == 0 {
         prefix_byte
     } else {
@@ -91,4 +102,3 @@ pub fn map_offset_between_texts(current: &str, compiled: &str, offset: usize) ->
         (mapped.round() as usize).min(compiled_len - suffix_byte_comp)
     }
 }
-

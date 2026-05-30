@@ -1,7 +1,7 @@
+use crate::ui::renderer::geometry::PT_TO_PX;
 use gpui::*;
 use typst::layout::{Frame, FrameItem};
 use typst::syntax::Source;
-use crate::ui::renderer::geometry::PT_TO_PX;
 
 fn is_math_placeholder(linked_node: &typst::syntax::LinkedNode) -> bool {
     use typst::syntax::SyntaxKind;
@@ -17,8 +17,6 @@ fn is_math_placeholder(linked_node: &typst::syntax::LinkedNode) -> bool {
     }
     false
 }
-
-
 
 // Recursive helper to traverse and render nested Typst Frame items natively inside GPUI
 #[allow(clippy::too_many_arguments)]
@@ -77,7 +75,7 @@ fn paint_frame_rec(
         match item {
             FrameItem::Text(text_item) => {
                 let size_px = px(text_item.size.to_pt() as f32 * PT_TO_PX) * zoom;
-                
+
                 // Map Typst text paint color directly to hardware accelerated color
                 let text_color = match &text_item.fill {
                     typst::visualize::Paint::Solid(color) => {
@@ -89,7 +87,12 @@ fn paint_frame_rec(
                             a: rgb.alpha,
                         }
                     }
-                    _ => gpui::Rgba { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                    _ => gpui::Rgba {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 1.0,
+                    },
                 };
 
                 // ── Font resolution ──────────────────────────────────────────────────────
@@ -110,17 +113,26 @@ fn paint_frame_rec(
                 let hsla_color: gpui::Hsla = text_color.into();
 
                 let mut current_x = item_x;
-                
+
                 let mut last_span = None;
                 let mut last_span_data = None; // (offset, is_placeholder, is_radical)
-                
+
                 for glyph in &text_item.glyphs {
-                    let x_offset = px((glyph.x_offset.get() as f32) * (text_item.size.to_pt() as f32) * PT_TO_PX) * zoom;
-                    let y_offset = px((glyph.y_offset.get() as f32) * (text_item.size.to_pt() as f32) * PT_TO_PX) * zoom;
-                    let x_advance = px((glyph.x_advance.get() as f32) * (text_item.size.to_pt() as f32) * PT_TO_PX) * zoom;
-                    
+                    let x_offset = px((glyph.x_offset.get() as f32)
+                        * (text_item.size.to_pt() as f32)
+                        * PT_TO_PX)
+                        * zoom;
+                    let y_offset = px((glyph.y_offset.get() as f32)
+                        * (text_item.size.to_pt() as f32)
+                        * PT_TO_PX)
+                        * zoom;
+                    let x_advance = px((glyph.x_advance.get() as f32)
+                        * (text_item.size.to_pt() as f32)
+                        * PT_TO_PX)
+                        * zoom;
+
                     let span = glyph.span.0;
-                    
+
                     if Some(span) != last_span {
                         last_span = Some(span);
                         if !span.is_detached() {
@@ -134,14 +146,15 @@ fn paint_frame_rec(
                                     || node_text.contains('∬')
                                     || node_text.contains('∭')
                                     || node_text.contains('∮');
-                                
+
                                 let is_radical_node = node_text.contains("sqrt")
                                     || node_text.contains("root")
                                     || node_text.contains('√')
                                     || node_text.contains('∛')
                                     || node_text.contains('∜');
-                                
-                                last_span_data = Some((offset, is_placeholder, is_radical_node || is_integral));
+
+                                last_span_data =
+                                    Some((offset, is_placeholder, is_radical_node || is_integral));
                             } else {
                                 last_span_data = None;
                             }
@@ -191,7 +204,9 @@ fn paint_frame_rec(
                             let face = text_item.font.ttf();
                             let units_per_em = face.units_per_em();
                             let scale = size_px / f32::from(units_per_em);
-                            if let Some(rect) = face.glyph_bounding_box(ttf_parser::GlyphId(glyph.id)) {
+                            if let Some(rect) =
+                                face.glyph_bounding_box(ttf_parser::GlyphId(glyph.id))
+                            {
                                 let y_max = f32::from(rect.y_max) * scale;
                                 let y_min = f32::from(rect.y_min) * scale;
                                 adjusted_box_top = item_y - y_offset - y_max;
@@ -265,12 +280,13 @@ fn paint_frame_rec(
                         }
 
                         // Construct GPUI GlyphId from Typst's shaped glyph ID using transmute
-                        let gpui_glyph_id: gpui::GlyphId = unsafe { std::mem::transmute(glyph.id as u32) };
-                        
+                        let gpui_glyph_id: gpui::GlyphId =
+                            unsafe { std::mem::transmute(glyph.id as u32) };
+
                         // Paint glyph directly at Typst's exact coordinate!
                         // Note: Typst's baseline is item_y. Typst's y_offset goes UP, so we subtract y_offset.
                         let glyph_origin = point(current_x + x_offset, item_y - y_offset);
-                        
+
                         let _ = window.paint_glyph(
                             glyph_origin,
                             font_id,
@@ -313,7 +329,12 @@ fn paint_frame_rec(
                             a: rgb.alpha,
                         }
                     }
-                    _ => gpui::Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
+                    _ => gpui::Rgba {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 0.0,
+                    },
                 };
 
                 let stroke_color = match &shape.stroke {
@@ -327,9 +348,19 @@ fn paint_frame_rec(
                                 a: rgb.alpha,
                             }
                         }
-                        _ => gpui::Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
+                        _ => gpui::Rgba {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 0.0,
+                        },
                     },
-                    None => gpui::Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
+                    None => gpui::Rgba {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 0.0,
+                    },
                 };
 
                 let stroke_width = match &shape.stroke {
@@ -401,23 +432,33 @@ fn paint_frame_rec(
                             for item in curve.0.iter() {
                                 match item {
                                     typst::visualize::CurveItem::Move(p) => {
-                                        let to_x = item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_y = item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_x =
+                                            item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_y =
+                                            item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
                                         fill_builder.move_to(point(to_x, to_y));
                                     }
                                     typst::visualize::CurveItem::Line(p) => {
-                                        let to_x = item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_y = item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_x =
+                                            item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_y =
+                                            item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
                                         fill_builder.line_to(point(to_x, to_y));
                                     }
                                     typst::visualize::CurveItem::Cubic(ctrl1, ctrl2, to) => {
-                                        let ctrl1_x = item_x + px(ctrl1.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let ctrl1_y = item_y + px(ctrl1.y.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let ctrl2_x = item_x + px(ctrl2.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let ctrl2_y = item_y + px(ctrl2.y.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_x = item_x + px(to.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_y = item_y + px(to.y.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        
+                                        let ctrl1_x =
+                                            item_x + px(ctrl1.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let ctrl1_y =
+                                            item_y + px(ctrl1.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let ctrl2_x =
+                                            item_x + px(ctrl2.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let ctrl2_y =
+                                            item_y + px(ctrl2.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_x =
+                                            item_x + px(to.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_y =
+                                            item_y + px(to.y.to_pt() as f32 * PT_TO_PX) * zoom;
+
                                         fill_builder.cubic_bezier_to(
                                             point(to_x, to_y),
                                             point(ctrl1_x, ctrl1_y),
@@ -440,23 +481,33 @@ fn paint_frame_rec(
                             for item in curve.0.iter() {
                                 match item {
                                     typst::visualize::CurveItem::Move(p) => {
-                                        let to_x = item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_y = item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_x =
+                                            item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_y =
+                                            item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
                                         stroke_builder.move_to(point(to_x, to_y));
                                     }
                                     typst::visualize::CurveItem::Line(p) => {
-                                        let to_x = item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_y = item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_x =
+                                            item_x + px(p.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_y =
+                                            item_y + px(p.y.to_pt() as f32 * PT_TO_PX) * zoom;
                                         stroke_builder.line_to(point(to_x, to_y));
                                     }
                                     typst::visualize::CurveItem::Cubic(ctrl1, ctrl2, to) => {
-                                        let ctrl1_x = item_x + px(ctrl1.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let ctrl1_y = item_y + px(ctrl1.y.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let ctrl2_x = item_x + px(ctrl2.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let ctrl2_y = item_y + px(ctrl2.y.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_x = item_x + px(to.x.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        let to_y = item_y + px(to.y.to_pt() as f32 * PT_TO_PX) * zoom;
-                                        
+                                        let ctrl1_x =
+                                            item_x + px(ctrl1.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let ctrl1_y =
+                                            item_y + px(ctrl1.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let ctrl2_x =
+                                            item_x + px(ctrl2.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let ctrl2_y =
+                                            item_y + px(ctrl2.y.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_x =
+                                            item_x + px(to.x.to_pt() as f32 * PT_TO_PX) * zoom;
+                                        let to_y =
+                                            item_y + px(to.y.to_pt() as f32 * PT_TO_PX) * zoom;
+
                                         stroke_builder.cubic_bezier_to(
                                             point(to_x, to_y),
                                             point(ctrl1_x, ctrl1_y),

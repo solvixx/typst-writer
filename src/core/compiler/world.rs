@@ -1,12 +1,12 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use typst::Library;
+use typst::LibraryExt;
 use typst::diag::FileResult;
 use typst::foundations::{Bytes, Datetime};
 use typst::syntax::{FileId, Source};
 use typst::text::{Font as TypstFont, FontBook};
 use typst::utils::LazyHash;
-use typst::Library;
-use typst::LibraryExt;
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 
 /// SimpleWorld implements the `typst::World` trait, providing the compiler with access
 /// to sources, files, fonts, and other environment information.
@@ -45,15 +45,18 @@ impl SimpleWorld {
 
     /// Creates a new SimpleWorld rooted at a specific directory.
     pub fn with_root(root: std::path::PathBuf, main_path: std::path::PathBuf) -> Self {
-        let vpath = typst::syntax::VirtualPath::within_root(&main_path, &root).unwrap_or_else(|| {
-            // Fallback: if main_path is outside root, use its filename as a root-relative path
-            let filename = main_path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("main.typ"));
-            typst::syntax::VirtualPath::new(filename)
-        });
+        let vpath =
+            typst::syntax::VirtualPath::within_root(&main_path, &root).unwrap_or_else(|| {
+                // Fallback: if main_path is outside root, use its filename as a root-relative path
+                let filename = main_path
+                    .file_name()
+                    .unwrap_or_else(|| std::ffi::OsStr::new("main.typ"));
+                typst::syntax::VirtualPath::new(filename)
+            });
         let main_id = FileId::new(None, vpath);
         let text = std::fs::read_to_string(&main_path).unwrap_or_default();
         let source = Source::new(main_id, text);
-        
+
         Self {
             library: LazyHash::new(Library::default()),
             book: &crate::core::font::FontManager::get().book,
@@ -96,21 +99,28 @@ impl SimpleWorld {
     fn resolve_package_file(id: FileId) -> Option<std::path::PathBuf> {
         use directories::BaseDirs;
         let spec = id.package()?;
-        let rel  = id.vpath().as_rootless_path();
+        let rel = id.vpath().as_rootless_path();
         let base_dirs = BaseDirs::new()?;
 
         let base = match spec.namespace.as_str() {
-            "local" => base_dirs.data_local_dir()
-                        .join("typst").join("packages").join("local"),
-            "preview" => base_dirs.cache_dir()
-                        .join("typst").join("packages").join("preview"),
+            "local" => base_dirs
+                .data_local_dir()
+                .join("typst")
+                .join("packages")
+                .join("local"),
+            "preview" => base_dirs
+                .cache_dir()
+                .join("typst")
+                .join("packages")
+                .join("preview"),
             _ => return None,
         };
 
-        Some(base
-            .join(spec.name.as_str())
-            .join(spec.version.to_string())
-            .join(rel))
+        Some(
+            base.join(spec.name.as_str())
+                .join(spec.version.to_string())
+                .join(rel),
+        )
     }
 }
 
@@ -220,21 +230,13 @@ impl typst::World for SimpleWorld {
 
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Local, Utc};
-        
+
         if let Some(offset) = offset {
             let naive = Utc::now().naive_utc() + chrono::Duration::hours(offset);
-            Datetime::from_ymd(
-                naive.year(),
-                naive.month() as u8,
-                naive.day() as u8,
-            )
+            Datetime::from_ymd(naive.year(), naive.month() as u8, naive.day() as u8)
         } else {
             let local = Local::now();
-            Datetime::from_ymd(
-                local.year(),
-                local.month() as u8,
-                local.day() as u8,
-            )
+            Datetime::from_ymd(local.year(), local.month() as u8, local.day() as u8)
         }
     }
 }

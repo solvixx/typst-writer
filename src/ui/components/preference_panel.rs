@@ -1,10 +1,10 @@
-use gpui::*;
-use gpui_component::{v_flex, h_flex, ActiveTheme, Sizable, StyledExt, Selectable};
-use gpui_component::button::{Button, ButtonVariants};
-use gpui_component::switch::Switch;
-use gpui_component::divider::Divider;
-use crate::ui::workspace::EditorWorkspace;
 use crate::core::config::{AppConfig, ConfigManager};
+use crate::ui::workspace::EditorWorkspace;
+use gpui::*;
+use gpui_component::button::{Button, ButtonVariants};
+use gpui_component::divider::Divider;
+use gpui_component::switch::Switch;
+use gpui_component::{ActiveTheme, Selectable, Sizable, StyledExt, h_flex, v_flex};
 
 pub struct PreferencePanel {
     workspace: WeakEntity<EditorWorkspace>,
@@ -23,7 +23,7 @@ impl PreferencePanel {
 impl Render for PreferencePanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let workspace_handle = self.workspace.clone();
-        
+
         let ws = if let Some(ws) = self.workspace.upgrade() {
             ws.read(cx).config.clone()
         } else {

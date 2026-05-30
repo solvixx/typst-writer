@@ -6,7 +6,7 @@ static INIT: Once = Once::new();
 pub fn register_typst() {
     INIT.call_once(|| {
         let typst_language: tree_sitter::Language = codebook_tree_sitter_typst::LANGUAGE.into();
-        
+
         let typst_config = LanguageConfig::new(
             "typst",
             typst_language,

@@ -1,12 +1,12 @@
+use crate::ui::workspace::EditorWorkspace;
 use gpui::*;
 use gpui_component::input::InputState;
-use crate::ui::workspace::EditorWorkspace;
 use lsp_types::*;
-use std::str::FromStr;
-use url::Url;
 use std::ops::Range;
-use typst::syntax::FileId;
+use std::str::FromStr;
 use typst::World;
+use typst::syntax::FileId;
+use url::Url;
 
 pub struct SourceEditorView {
     _workspace: WeakEntity<EditorWorkspace>,
@@ -14,13 +14,13 @@ pub struct SourceEditorView {
     lsp_client: Option<std::sync::Arc<crate::core::lsp::LspClient>>,
     pub uri: Uri,
     pub window_handle: AnyWindowHandle,
-    
+
     // Performance snapshots to avoid redundant work
     last_text: gpui_component::Rope,
     last_cursor: usize,
     last_selection: Option<Range<usize>>,
     lsp_sync_task: Option<Task<()>>,
-    
+
     // Dirty tracking
     pub saved_text: gpui_component::Rope,
     pub is_dirty: bool,
@@ -37,7 +37,7 @@ impl SourceEditorView {
         initial_text: String,
     ) -> Self {
         let initial_text_rope = gpui_component::Rope::from(initial_text.clone());
-        
+
         // Standardize URI for LSP using the correct file path
         let uri_str = format!("file://{}", path.to_string_lossy());
         let uri = Uri::from_str(&uri_str).unwrap();
@@ -48,10 +48,13 @@ impl SourceEditorView {
                 .line_number(true)
                 .multi_line(true)
                 .default_value(initial_text.clone());
-            
+
             if let Some(client) = lsp_client.clone() {
                 use std::rc::Rc;
-                let provider = Rc::new(crate::ui::editor::lsp::TypstLspProvider::new(client, uri.clone()));
+                let provider = Rc::new(crate::ui::editor::lsp::TypstLspProvider::new(
+                    client,
+                    uri.clone(),
+                ));
                 state.lsp.completion_provider = Some(provider);
             }
             state
@@ -77,12 +80,16 @@ impl SourceEditorView {
                 let state = input.read(cx);
                 let cursor = state.cursor();
                 let selection = state.selected_range;
-                
+
                 // PERFORMANCE: Check if content actually changed before expensive to_string()
                 let content_changed = state.text() != &this.last_text;
                 let cursor_moved = cursor != this.last_cursor;
-                
-                let selection_range = if selection.is_empty() { None } else { Some(selection.start..selection.end) };
+
+                let selection_range = if selection.is_empty() {
+                    None
+                } else {
+                    Some(selection.start..selection.end)
+                };
                 let selection_changed = selection_range != this.last_selection;
 
                 if !content_changed && !cursor_moved && !selection_changed {
@@ -111,10 +118,13 @@ impl SourceEditorView {
                     this.lsp_sync_task = Some(cx.spawn(move |_, cx: &mut AsyncApp| {
                         let cx = cx.clone();
                         async move {
-                            cx.background_executor().timer(std::time::Duration::from_millis(150)).await;
-                            let text = cx.background_executor().spawn(async move {
-                                text_rope_clone.to_string()
-                            }).await;
+                            cx.background_executor()
+                                .timer(std::time::Duration::from_millis(150))
+                                .await;
+                            let text = cx
+                                .background_executor()
+                                .spawn(async move { text_rope_clone.to_string() })
+                                .await;
                             let _ = client.did_change(DidChangeTextDocumentParams {
                                 text_document: VersionedTextDocumentIdentifier {
                                     uri: uri_clone,
@@ -133,11 +143,13 @@ impl SourceEditorView {
                 if let Some(ws_handle) = workspace.upgrade() {
                     let uri_str = this.uri.to_string();
                     let url = url::Url::from_str(&uri_str).unwrap();
-                    
+
                     cx.update_window(window_handle, |_, window, cx| {
                         ws_handle.update(cx, |ws, cx| {
-                            let path = url.to_file_path().unwrap_or_else(|_| std::path::PathBuf::from(url.path().to_string()));
-                            
+                            let path = url.to_file_path().unwrap_or_else(|_| {
+                                std::path::PathBuf::from(url.path().to_string())
+                            });
+
                             // If this editor is focused, it's the active one
                             let is_focused = input.read(cx).focus_handle(cx).is_focused(window);
 
@@ -145,18 +157,25 @@ impl SourceEditorView {
                                 ws.active_editor_path = Some(path.clone());
                                 ws.cursor_offset = cursor;
                                 if !ws.is_dragging {
-                                    ws.selection = selection_range.map(|r| gpui_component::input::Selection::new(r.start, r.end));
+                                    ws.selection = selection_range.map(|r| {
+                                        gpui_component::input::Selection::new(r.start, r.end)
+                                    });
                                 }
                             }
 
                             if content_changed {
                                 // Find common prefix/suffix for minimal edit
-                                let root = ws.world.root_path.clone().unwrap_or_else(|| std::path::PathBuf::from("."));
-                                let vpath = typst::syntax::VirtualPath::within_root(&path, &root).unwrap_or_else(|| {
-                                    typst::syntax::VirtualPath::new(path.file_name().unwrap())
-                                });
+                                let root = ws
+                                    .world
+                                    .root_path
+                                    .clone()
+                                    .unwrap_or_else(|| std::path::PathBuf::from("."));
+                                let vpath = typst::syntax::VirtualPath::within_root(&path, &root)
+                                    .unwrap_or_else(|| {
+                                        typst::syntax::VirtualPath::new(path.file_name().unwrap())
+                                    });
                                 let id = FileId::new(None, vpath);
-                                
+
                                 let old_text = if let Ok(s) = ws.world.source(id) {
                                     s.text().to_string()
                                 } else {
@@ -164,18 +183,34 @@ impl SourceEditorView {
                                 };
 
                                 if !rope_eq_str(&text_rope, &old_text) {
-                                    let (common_prefix, common_suffix) = find_common_prefix_suffix(&old_text, &text_rope);
+                                    let (common_prefix, common_suffix) =
+                                        find_common_prefix_suffix(&old_text, &text_rope);
 
                                     let range = common_prefix..(old_text.len() - common_suffix);
-                                    let replacement = text_rope.slice(common_prefix..(text_rope.len() - common_suffix)).to_string();
-                                    let url = Url::from_str(&format!("file://{}", path.to_string_lossy())).unwrap();
+                                    let replacement = text_rope
+                                        .slice(common_prefix..(text_rope.len() - common_suffix))
+                                        .to_string();
+                                    let url = Url::from_str(&format!(
+                                        "file://{}",
+                                        path.to_string_lossy()
+                                    ))
+                                    .unwrap();
 
-                                    ws.apply_editor_action_from_editor(&url, crate::core::editor::EditorAction::Edit {
-                                        range,
-                                        replacement,
-                                        new_cursor: cursor,
-                                        new_selection: if selection.is_empty() { None } else { Some(selection.start..selection.end) },
-                                    }, window, cx);
+                                    ws.apply_editor_action_from_editor(
+                                        &url,
+                                        crate::core::editor::EditorAction::Edit {
+                                            range,
+                                            replacement,
+                                            new_cursor: cursor,
+                                            new_selection: if selection.is_empty() {
+                                                None
+                                            } else {
+                                                Some(selection.start..selection.end)
+                                            },
+                                        },
+                                        window,
+                                        cx,
+                                    );
                                 }
                             }
 
@@ -186,19 +221,20 @@ impl SourceEditorView {
                             }
                             cx.notify();
                         });
-                    }).ok();
+                    })
+                    .ok();
                 }
             }
-        }).detach();
+        })
+        .detach();
 
-
-        Self { 
-            _workspace: workspace, 
-            input, 
+        Self {
+            _workspace: workspace,
+            input,
             lsp_client,
             uri,
             window_handle,
-            last_text: initial_text_rope.clone(), 
+            last_text: initial_text_rope.clone(),
             last_cursor: 0,
             last_selection: None,
             lsp_sync_task: None,
@@ -245,7 +281,10 @@ impl SourceEditorView {
 
             if let Some(client) = &self.lsp_client {
                 use std::rc::Rc;
-                let provider = Rc::new(crate::ui::editor::lsp::TypstLspProvider::new(client.clone(), uri.clone()));
+                let provider = Rc::new(crate::ui::editor::lsp::TypstLspProvider::new(
+                    client.clone(),
+                    uri.clone(),
+                ));
                 input.lsp.completion_provider = Some(provider.clone());
                 input.lsp.hover_provider = Some(provider);
             }
@@ -268,7 +307,7 @@ impl Render for SourceEditorView {
             .child(
                 gpui_component::input::Input::new(&self.input)
                     .size_full()
-                    .rounded_none()
+                    .rounded_none(),
             )
     }
 }
@@ -289,7 +328,8 @@ impl gpui_component::dock::Panel for SourceEditorView {
             .ok()
             .and_then(|u| u.to_file_path().ok())
             .unwrap_or_else(|| std::path::PathBuf::from(self.uri.path().to_string()));
-        let mut name = path.file_name()
+        let mut name = path
+            .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "Source".to_string());
         if self.is_dirty {
@@ -303,7 +343,8 @@ impl gpui_component::dock::Panel for SourceEditorView {
             .ok()
             .and_then(|u| u.to_file_path().ok())
             .unwrap_or_else(|| std::path::PathBuf::from(self.uri.path().to_string()));
-        let mut name = path.file_name()
+        let mut name = path
+            .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "Source Editor".to_string());
         if self.is_dirty {
@@ -317,14 +358,19 @@ impl gpui_component::dock::Panel for SourceEditorView {
     }
 
     fn visible(&self, cx: &App) -> bool {
-        self._workspace.upgrade().map(|ws| ws.read(cx).config.source_code_visible).unwrap_or(true)
+        self._workspace
+            .upgrade()
+            .map(|ws| ws.read(cx).config.source_code_visible)
+            .unwrap_or(true)
     }
 
     fn on_removed(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         if let Some(ws_handle) = self._workspace.upgrade() {
             let uri_str = self.uri.to_string();
             let url = url::Url::from_str(&uri_str).unwrap();
-            let path = url.to_file_path().unwrap_or_else(|_| std::path::PathBuf::from(url.path().to_string()));
+            let path = url
+                .to_file_path()
+                .unwrap_or_else(|_| std::path::PathBuf::from(url.path().to_string()));
             ws_handle.update(cx, |ws, cx| {
                 ws.editors.remove(&path);
                 if ws.active_editor_path.as_ref() == Some(&path) {
@@ -356,25 +402,29 @@ fn rope_eq_str(rope: &gpui_component::Rope, s: &str) -> bool {
 fn find_common_prefix_suffix(old: &str, new: &gpui_component::Rope) -> (usize, usize) {
     let old_bytes = old.as_bytes();
     let mut common_prefix = 0;
-    
+
     // Prefix
     for (i, b) in old_bytes.iter().enumerate() {
-        if i >= new.len() { break; }
-        if *b != new.byte(i) { break; }
+        if i >= new.len() {
+            break;
+        }
+        if *b != new.byte(i) {
+            break;
+        }
         common_prefix = i + 1;
     }
-    
+
     // Suffix
     let mut common_suffix = 0;
     let old_len = old_bytes.len();
     let new_len = new.len();
-    
+
     while common_suffix < old_len - common_prefix && common_suffix < new_len - common_prefix {
         if old_bytes[old_len - 1 - common_suffix] != new.byte(new_len - 1 - common_suffix) {
             break;
         }
         common_suffix += 1;
     }
-    
+
     (common_prefix, common_suffix)
 }

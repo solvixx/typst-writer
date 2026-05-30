@@ -1,12 +1,12 @@
-use gpui::*;
-use gpui_component::v_flex;
-use gpui_component::scroll::ScrollableElement;
-use gpui_component::StyledExt;
-use gpui_component::ActiveTheme;
-use gpui_component::button::Button;
-use gpui_component::tooltip::Tooltip;
-use gpui_component::{Selectable, Sizable};
 use crate::ui::workspace::EditorWorkspace;
+use gpui::*;
+use gpui_component::ActiveTheme;
+use gpui_component::StyledExt;
+use gpui_component::button::Button;
+use gpui_component::scroll::ScrollableElement;
+use gpui_component::tooltip::Tooltip;
+use gpui_component::v_flex;
+use gpui_component::{Selectable, Sizable};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FilterLevel {
@@ -29,7 +29,8 @@ impl LogPanel {
         if let Some(ws) = workspace.upgrade() {
             cx.observe(&ws, |_this, _, cx| {
                 cx.notify();
-            }).detach();
+            })
+            .detach();
         }
         Self {
             workspace,
@@ -38,9 +39,14 @@ impl LogPanel {
         }
     }
 
-    fn render_filter_button(&self, level: FilterLevel, label: &'static str, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_filter_button(
+        &self,
+        level: FilterLevel,
+        label: &'static str,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let is_selected = self.filter == level;
-        
+
         Button::new(label)
             .label(label)
             .selected(is_selected)
@@ -63,15 +69,13 @@ impl Render for LogPanel {
 
         let filtered_logs: Vec<(String, String, String)> = logs
             .into_iter()
-            .filter(|(_, level, _)| {
-                match self.filter {
-                    FilterLevel::All => true,
-                    FilterLevel::Info => level == "INFO",
-                    FilterLevel::Warn => level == "WARN",
-                    FilterLevel::Error => level == "ERROR",
-                    #[cfg(debug_assertions)]
-                    FilterLevel::Debug => level == "DEBUG",
-                }
+            .filter(|(_, level, _)| match self.filter {
+                FilterLevel::All => true,
+                FilterLevel::Info => level == "INFO",
+                FilterLevel::Warn => level == "WARN",
+                FilterLevel::Error => level == "ERROR",
+                #[cfg(debug_assertions)]
+                FilterLevel::Debug => level == "DEBUG",
             })
             .collect();
 
@@ -102,7 +106,7 @@ impl Render for LogPanel {
                                     .text_xs()
                                     .font_bold()
                                     .text_color(cx.theme().foreground)
-                                    .child("CONSOLE LOGS")
+                                    .child("CONSOLE LOGS"),
                             )
                             .child(
                                 div()
@@ -112,17 +116,28 @@ impl Render for LogPanel {
                                     .child(self.render_filter_button(FilterLevel::All, "All", cx))
                                     .child(self.render_filter_button(FilterLevel::Info, "Info", cx))
                                     .child(self.render_filter_button(FilterLevel::Warn, "Warn", cx))
-                                    .child(self.render_filter_button(FilterLevel::Error, "Error", cx))
+                                    .child(self.render_filter_button(
+                                        FilterLevel::Error,
+                                        "Error",
+                                        cx,
+                                    ))
                                     .children({
                                         #[allow(unused_mut)]
                                         let mut items = Vec::<AnyElement>::new();
                                         #[cfg(debug_assertions)]
                                         {
-                                            items.push(self.render_filter_button(FilterLevel::Debug, "Debug", cx).into_any_element());
+                                            items.push(
+                                                self.render_filter_button(
+                                                    FilterLevel::Debug,
+                                                    "Debug",
+                                                    cx,
+                                                )
+                                                .into_any_element(),
+                                            );
                                         }
                                         items
-                                    })
-                            )
+                                    }),
+                            ),
                     )
                     .child(
                         div()
@@ -139,12 +154,16 @@ impl Render for LogPanel {
                                         move |_, _, _, cx| {
                                             let full_text = filtered_logs
                                                 .iter()
-                                                .map(|(ts, level, msg)| format!("[{}] [{}] {}", ts, level, msg))
+                                                .map(|(ts, level, msg)| {
+                                                    format!("[{}] [{}] {}", ts, level, msg)
+                                                })
                                                 .collect::<Vec<String>>()
                                                 .join("\n");
-                                            cx.write_to_clipboard(ClipboardItem::new_string(full_text));
+                                            cx.write_to_clipboard(ClipboardItem::new_string(
+                                                full_text,
+                                            ));
                                         }
-                                    }))
+                                    })),
                             )
                             .child(
                                 Button::new("clear")
@@ -158,9 +177,9 @@ impl Render for LogPanel {
                                                 cx.notify();
                                             });
                                         }
-                                    }))
-                            )
-                    )
+                                    })),
+                            ),
+                    ),
             )
             .child(
                 // Logs Content
@@ -169,11 +188,9 @@ impl Render for LogPanel {
                     .min_h_0()
                     .overflow_y_scrollbar()
                     .px_3()
-                    .child(
-                        v_flex()
-                            .py_2()
-                            .gap_1()
-                            .children(filtered_logs.into_iter().rev().enumerate().map(|(idx, (ts, level, msg))| {
+                    .child(v_flex().py_2().gap_1().children(
+                        filtered_logs.into_iter().rev().enumerate().map(
+                            |(idx, (ts, level, msg))| {
                                 let badge_color = match level.as_str() {
                                     "ERROR" => cx.theme().danger,
                                     "WARN" => cx.theme().warning,
@@ -208,7 +225,11 @@ impl Render for LogPanel {
                                     .rounded_md()
                                     .border_1()
                                     .border_color(gpui::transparent_black())
-                                    .hover(|style| style.bg(cx.theme().list_hover).border_color(cx.theme().border))
+                                    .hover(|style| {
+                                        style
+                                            .bg(cx.theme().list_hover)
+                                            .border_color(cx.theme().border)
+                                    })
                                     .cursor_pointer()
                                     .tooltip(move |window, cx| {
                                         Tooltip::new("Click to copy log line").build(window, cx)
@@ -219,7 +240,9 @@ impl Render for LogPanel {
                                         let ts = ts.clone();
                                         cx.listener(move |_, _, _, cx| {
                                             let log_line = format!("[{}] [{}] {}", ts, level, msg);
-                                            cx.write_to_clipboard(ClipboardItem::new_string(log_line));
+                                            cx.write_to_clipboard(ClipboardItem::new_string(
+                                                log_line,
+                                            ));
                                         })
                                     })
                                     .child(
@@ -227,7 +250,7 @@ impl Render for LogPanel {
                                         div()
                                             .flex_none()
                                             .text_color(cx.theme().muted_foreground)
-                                            .child(format!("[{}]", ts))
+                                            .child(format!("[{}]", ts)),
                                     )
                                     .child(
                                         // Badge
@@ -245,16 +268,14 @@ impl Render for LogPanel {
                                             .font_semibold()
                                             .text_xs()
                                             .text_color(badge_color)
-                                            .child(level)
+                                            .child(level),
                                     )
                                     .child(
-                                        div()
-                                            .flex_1()
-                                            .text_color(cx.theme().foreground)
-                                            .child(msg)
+                                        div().flex_1().text_color(cx.theme().foreground).child(msg),
                                     )
-                            }))
-                    )
+                            },
+                        ),
+                    )),
             )
     }
 }

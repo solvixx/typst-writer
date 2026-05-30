@@ -9,8 +9,8 @@ mod tiles;
 use anyhow::Result;
 use gpui::{
     AnyElement, AnyView, App, AppContext, Axis, Bounds, Context, Edges, Entity, EntityId,
-    EventEmitter, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
-    SharedString, Styled, Subscription, WeakEntity, Window, actions, canvas, div,
+    EventEmitter, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    Render, SharedString, Styled, Subscription, WeakEntity, Window, actions, canvas, div,
     prelude::FluentBuilder,
 };
 use std::sync::Arc;
@@ -92,7 +92,9 @@ fn find_parent_tab_panel_of_panel(
     } else if let Ok(tiles) = any_view.clone().downcast::<Tiles>() {
         let tiles_ref = tiles.read(cx);
         for tile_item in &tiles_ref.panels {
-            if let Some(found) = find_parent_tab_panel_of_panel(tile_item.panel.clone(), panel.clone(), cx) {
+            if let Some(found) =
+                find_parent_tab_panel_of_panel(tile_item.panel.clone(), panel.clone(), cx)
+            {
                 return Some(found);
             }
         }
@@ -103,17 +105,17 @@ fn find_parent_tab_panel_of_panel(
 
 /// Recursively searches the live layout tree to locate the first `TabPanel`
 /// that is dedicated to source code editors (meaning it contains no preview panels).
-fn find_editor_tab_panel(
-    root: Arc<dyn PanelView>,
-    cx: &App,
-) -> Option<Entity<TabPanel>> {
+fn find_editor_tab_panel(root: Arc<dyn PanelView>, cx: &App) -> Option<Entity<TabPanel>> {
     let any_view = root.view();
 
     if let Ok(tab_panel) = any_view.clone().downcast::<TabPanel>() {
         let tab_panel_ref = tab_panel.read(cx);
         // Identify panels based on the reflective panel_name.
         // We look for a TabPanel that does not hold the PDF Renderer preview.
-        let has_preview = tab_panel_ref.panels.iter().any(|p| p.panel_name(cx) == "Renderer");
+        let has_preview = tab_panel_ref
+            .panels
+            .iter()
+            .any(|p| p.panel_name(cx) == "Renderer");
         if !has_preview {
             return Some(tab_panel.clone());
         }
@@ -148,7 +150,10 @@ fn find_active_editor_tab_panel(
 
     if let Ok(tab_panel) = any_view.clone().downcast::<TabPanel>() {
         let tab_panel_ref = tab_panel.read(cx);
-        let has_preview = tab_panel_ref.panels.iter().any(|p| p.panel_name(cx) == "Renderer");
+        let has_preview = tab_panel_ref
+            .panels
+            .iter()
+            .any(|p| p.panel_name(cx) == "Renderer");
         // A TabPanel delegates its focus handle to the active panel inside it (the focused editor).
         if !has_preview && tab_panel_ref.focus_handle(cx).is_focused(window) {
             return Some(tab_panel.clone());
@@ -174,15 +179,15 @@ fn find_active_editor_tab_panel(
 
 /// Recursively searches the live layout tree to locate the first `TabPanel`
 /// that contains the PDF Renderer preview.
-fn find_preview_tab_panel(
-    root: Arc<dyn PanelView>,
-    cx: &App,
-) -> Option<Entity<TabPanel>> {
+fn find_preview_tab_panel(root: Arc<dyn PanelView>, cx: &App) -> Option<Entity<TabPanel>> {
     let any_view = root.view();
 
     if let Ok(tab_panel) = any_view.clone().downcast::<TabPanel>() {
         let tab_panel_ref = tab_panel.read(cx);
-        let has_preview = tab_panel_ref.panels.iter().any(|p| p.panel_name(cx) == "Renderer");
+        let has_preview = tab_panel_ref
+            .panels
+            .iter()
+            .any(|p| p.panel_name(cx) == "Renderer");
         if has_preview {
             return Some(tab_panel.clone());
         }
@@ -567,7 +572,10 @@ impl DockItem {
     ) {
         match self {
             Self::Tabs { view, items, .. } => {
-                if let Some(idx) = items.iter().position(|p| p.view().entity_id() == panel.view().entity_id()) {
+                if let Some(idx) = items
+                    .iter()
+                    .position(|p| p.view().entity_id() == panel.view().entity_id())
+                {
                     view.update(cx, |tab_panel, cx| {
                         tab_panel.set_active_ix(idx, window, cx);
                     });
@@ -995,9 +1003,15 @@ impl DockArea {
         cx: &mut Context<Self>,
     ) {
         // 1. Check center items first
-        if let Some(tab_panel) = find_parent_tab_panel_of_panel(self.items.view(), panel.clone(), cx) {
+        if let Some(tab_panel) =
+            find_parent_tab_panel_of_panel(self.items.view(), panel.clone(), cx)
+        {
             tab_panel.update(cx, |view, cx| {
-                if let Some(idx) = view.panels.iter().position(|p| p.panel_id(cx) == panel.panel_id(cx)) {
+                if let Some(idx) = view
+                    .panels
+                    .iter()
+                    .position(|p| p.panel_id(cx) == panel.panel_id(cx))
+                {
                     view.set_active_ix(idx, window, cx);
                 }
             });
@@ -1010,7 +1024,11 @@ impl DockArea {
             let left_view = dock.update(cx, |d, _cx| d.panel.view());
             if let Some(tab_panel) = find_parent_tab_panel_of_panel(left_view, panel.clone(), cx) {
                 tab_panel.update(cx, |view, cx| {
-                    if let Some(idx) = view.panels.iter().position(|p| p.panel_id(cx) == panel.panel_id(cx)) {
+                    if let Some(idx) = view
+                        .panels
+                        .iter()
+                        .position(|p| p.panel_id(cx) == panel.panel_id(cx))
+                    {
                         view.set_active_ix(idx, window, cx);
                     }
                 });
@@ -1025,7 +1043,11 @@ impl DockArea {
             let right_view = dock.update(cx, |d, _cx| d.panel.view());
             if let Some(tab_panel) = find_parent_tab_panel_of_panel(right_view, panel.clone(), cx) {
                 tab_panel.update(cx, |view, cx| {
-                    if let Some(idx) = view.panels.iter().position(|p| p.panel_id(cx) == panel.panel_id(cx)) {
+                    if let Some(idx) = view
+                        .panels
+                        .iter()
+                        .position(|p| p.panel_id(cx) == panel.panel_id(cx))
+                    {
                         view.set_active_ix(idx, window, cx);
                     }
                 });
@@ -1038,9 +1060,14 @@ impl DockArea {
         // 4. Check bottom dock
         if let Some(dock) = self.bottom_dock.as_ref() {
             let bottom_view = dock.update(cx, |d, _cx| d.panel.view());
-            if let Some(tab_panel) = find_parent_tab_panel_of_panel(bottom_view, panel.clone(), cx) {
+            if let Some(tab_panel) = find_parent_tab_panel_of_panel(bottom_view, panel.clone(), cx)
+            {
                 tab_panel.update(cx, |view, cx| {
-                    if let Some(idx) = view.panels.iter().position(|p| p.panel_id(cx) == panel.panel_id(cx)) {
+                    if let Some(idx) = view
+                        .panels
+                        .iter()
+                        .position(|p| p.panel_id(cx) == panel.panel_id(cx))
+                    {
                         view.set_active_ix(idx, window, cx);
                     }
                 });
@@ -1062,7 +1089,9 @@ impl DockArea {
                     });
                     cx.notify();
                     return;
-                } else if let Some(preview_tab_panel) = find_preview_tab_panel(self.items.view(), cx) {
+                } else if let Some(preview_tab_panel) =
+                    find_preview_tab_panel(self.items.view(), cx)
+                {
                     preview_tab_panel.update(cx, |view, cx| {
                         view.add_panel_at(panel, crate::Placement::Left, None, window, cx);
                     });
@@ -1076,7 +1105,8 @@ impl DockArea {
                     });
                     cx.notify();
                     return;
-                } else if let Some(editor_tab_panel) = find_editor_tab_panel(self.items.view(), cx) {
+                } else if let Some(editor_tab_panel) = find_editor_tab_panel(self.items.view(), cx)
+                {
                     editor_tab_panel.update(cx, |view, cx| {
                         view.add_panel_at(panel, crate::Placement::Right, None, window, cx);
                     });

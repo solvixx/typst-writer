@@ -1,17 +1,17 @@
-use std::path::{Path, PathBuf};
-use gpui::*;
-use lsp_types::Uri;
-use typst::syntax::FileId;
-use gpui_component::h_flex;
-use gpui_component::tree::{Tree, TreeState, TreeItem};
-use gpui_component::list::ListItem;
-use gpui_component::ActiveTheme;
-use gpui_component::menu::{ContextMenuExt, PopupMenuItem};
-use gpui_component::WindowExt;
-use gpui_component::input::{InputState, InputEvent};
-use gpui_component::Sizable;
-use gpui_component::switch::Switch;
 use crate::ui::workspace::EditorWorkspace;
+use gpui::*;
+use gpui_component::ActiveTheme;
+use gpui_component::Sizable;
+use gpui_component::WindowExt;
+use gpui_component::h_flex;
+use gpui_component::input::{InputEvent, InputState};
+use gpui_component::list::ListItem;
+use gpui_component::menu::{ContextMenuExt, PopupMenuItem};
+use gpui_component::switch::Switch;
+use gpui_component::tree::{Tree, TreeItem, TreeState};
+use lsp_types::Uri;
+use std::path::{Path, PathBuf};
+use typst::syntax::FileId;
 
 // Define high-fidelity action types for VS Code-like explorer shortcuts and menu entries
 gpui::actions!(
@@ -30,7 +30,12 @@ pub struct FileTree {
 }
 
 impl FileTree {
-    pub fn new(workspace: WeakEntity<EditorWorkspace>, root: PathBuf, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        workspace: WeakEntity<EditorWorkspace>,
+        root: PathBuf,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let focus_handle = cx.focus_handle();
         let tree_state = cx.new(|cx| {
             // TRULY LAZY: Only load the immediate root level.
@@ -41,7 +46,8 @@ impl FileTree {
         // Observe tree_state to automatically notify and re-render FileTree upon changes
         cx.observe(&tree_state, |_, _, cx| {
             cx.notify();
-        }).detach();
+        })
+        .detach();
 
         // Register high-fidelity file tree hotkeys for active Tree focus context
         cx.bind_keys([
@@ -83,12 +89,16 @@ impl FileTree {
         if let Ok(entries) = std::fs::read_dir(path) {
             let mut entries: Vec<_> = entries.flatten().collect();
             // Sort: Directories first, then alphabetical
-            entries.sort_by_key(|e| ( !e.path().is_dir(), e.file_name() ));
-            
+            entries.sort_by_key(|e| (!e.path().is_dir(), e.file_name()));
+
             for entry in entries {
                 let path = entry.path();
-                let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                
+                let name = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+
                 // CRITICAL: Skip HIDDEN and MASSIVE directories
                 if name.starts_with('.') || name == "target" || name == "node_modules" {
                     continue;
@@ -96,7 +106,7 @@ impl FileTree {
 
                 let id = path.to_string_lossy().to_string();
                 let mut item = TreeItem::new(id, name);
-                
+
                 if path.is_dir() {
                     let children = Self::load_level(&path);
                     for child in children {
@@ -122,7 +132,10 @@ impl FileTree {
         let parent = if is_folder {
             Path::new(&path_str).to_path_buf()
         } else {
-            Path::new(&path_str).parent().unwrap_or(Path::new(".")).to_path_buf()
+            Path::new(&path_str)
+                .parent()
+                .unwrap_or(Path::new("."))
+                .to_path_buf()
         };
 
         let input_state = cx.new(|cx| {
@@ -170,7 +183,7 @@ impl FileTree {
                     div()
                         .w_full()
                         .py_2()
-                        .child(gpui_component::input::Input::new(&input_state))
+                        .child(gpui_component::input::Input::new(&input_state)),
                 )
         });
     }
@@ -184,7 +197,10 @@ impl FileTree {
         let parent = if is_folder {
             Path::new(&path_str).to_path_buf()
         } else {
-            Path::new(&path_str).parent().unwrap_or(Path::new(".")).to_path_buf()
+            Path::new(&path_str)
+                .parent()
+                .unwrap_or(Path::new("."))
+                .to_path_buf()
         };
 
         let input_state = cx.new(|cx| {
@@ -221,7 +237,7 @@ impl FileTree {
                     div()
                         .w_full()
                         .py_2()
-                        .child(gpui_component::input::Input::new(&input_state))
+                        .child(gpui_component::input::Input::new(&input_state)),
                 )
         });
     }
@@ -231,7 +247,11 @@ impl FileTree {
         if let Some(entry) = selected {
             let path_str = entry.item().id.to_string();
             let p = Path::new(&path_str).to_path_buf();
-            let file_name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let file_name = p
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
 
             let tree_state = self.tree_state.clone();
             let root = self.root.clone();
@@ -257,17 +277,21 @@ impl FileTree {
 
                             if success {
                                 Self::refresh(&tree_state, &root, cx);
-                                
+
                                 if let Some(workspace) = workspace.upgrade() {
                                     workspace.update(cx, |ws, cx| {
-                                        let is_active = ws.world.root_path.as_ref()
+                                        let is_active = ws
+                                            .world
+                                            .root_path
+                                            .as_ref()
                                             .and_then(|r| ws.world.main_id.vpath().resolve(r))
                                             .map(|path| path == p || path.starts_with(&p))
                                             .unwrap_or(false);
-                                        
+
                                         if is_active {
                                             let main_id = ws.world.main_id;
-                                            ws.world.main_source = typst::syntax::Source::new(main_id, "".to_string());
+                                            ws.world.main_source =
+                                                typst::syntax::Source::new(main_id, "".to_string());
                                             if let Some(editor) = ws.editors.get(&p) {
                                                 editor.update(cx, |editor, cx| {
                                                     editor.input.update(cx, |input, cx| {
@@ -277,7 +301,7 @@ impl FileTree {
                                             }
                                             ws.compile(cx);
                                         }
-                                        
+
                                         // Always remove from open editors if present
                                         ws.editors.remove(&p);
                                         if ws.active_editor_path.as_ref() == Some(&p) {
@@ -289,12 +313,10 @@ impl FileTree {
                             true
                         }
                     })
-                    .child(
-                        div()
-                            .py_2()
-                            .text_sm()
-                            .child(format!("Are you sure you want to delete '{}'?", file_name_str))
-                    )
+                    .child(div().py_2().text_sm().child(format!(
+                        "Are you sure you want to delete '{}'?",
+                        file_name_str
+                    )))
             });
         }
     }
@@ -304,14 +326,26 @@ impl FileTree {
         if let Some(entry) = selected {
             let path_str = entry.item().id.to_string();
             let p = Path::new(&path_str).to_path_buf();
-            let file_name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let file_name = p
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
 
             let input_state = cx.new(|cx| {
                 let mut state = InputState::new(window, cx);
                 state.set_value(&file_name, window, cx);
-                let stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
+                let stem = p
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
                 let stem_len = stem.len();
-                state.set_selected_range(gpui_component::input::Selection::new(0, stem_len), false, cx);
+                state.set_selected_range(
+                    gpui_component::input::Selection::new(0, stem_len),
+                    false,
+                    cx,
+                );
                 state.focus(window, cx);
                 state
             });
@@ -411,10 +445,21 @@ impl FileTree {
             if !entry.is_folder() {
                 let path_str = entry.item().id.to_string();
                 let p = Path::new(&path_str).to_path_buf();
-                
-                let file_name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
-                let stem = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
-                let ext = p.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+
+                let file_name = p
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                let stem = p
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                let ext = p
+                    .extension()
+                    .map(|e| format!(".{}", e.to_string_lossy()))
+                    .unwrap_or_default();
                 let default_dup_name = format!("{}_copy{}", stem, ext);
 
                 let input_state = cx.new(|cx| {
@@ -440,7 +485,8 @@ impl FileTree {
                             let tree_state = tree_state.clone();
                             let root = root.clone();
                             move |_, _, cx| {
-                                let new_name = input_state.read(cx).text().to_string().trim().to_string();
+                                let new_name =
+                                    input_state.read(cx).text().to_string().trim().to_string();
                                 if !new_name.is_empty() && new_name != name_original {
                                     if let Some(parent) = old_path.parent() {
                                         let new_path = parent.join(new_name);
@@ -456,7 +502,7 @@ impl FileTree {
                             div()
                                 .w_full()
                                 .py_2()
-                                .child(gpui_component::input::Input::new(&input_state))
+                                .child(gpui_component::input::Input::new(&input_state)),
                         )
                 });
             }

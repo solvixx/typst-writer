@@ -13,7 +13,7 @@ mod tests {
     #[test]
     fn test_sqrt_three_stage_atomic_deletion() {
         let source = Source::detached("$sqrt(2)$");
-        
+
         // --- STAGE 1: Pressing backspace/delete on content inside a math structure restores it to '?' placeholder ---
         let state_delete = EditorState {
             text: source.text(),
@@ -57,24 +57,33 @@ mod tests {
             selection: None,
             context: EditorContext::Math,
         };
-        let action_sel = handle_key_event(&source_placeholder, &state_before_placeholder, "backspace", false);
+        let action_sel = handle_key_event(
+            &source_placeholder,
+            &state_before_placeholder,
+            "backspace",
+            false,
+        );
         assert_eq!(
             action_sel,
-            EditorAction::Select { range: 1..8, reversed: true }
+            EditorAction::Select {
+                range: 1..8,
+                reversed: true
+            }
         );
 
         // --- STAGE 3: Pressing backspace when whole structure is selected deletes it ---
         let state_sel = EditorState {
             text: source_placeholder.text(),
-            cursor: 1, 
+            cursor: 1,
             selection: Some(1..8),
             context: EditorContext::Math,
         };
-        let action_del_final = handle_key_event(&source_placeholder, &state_sel, "backspace", false);
+        let action_del_final =
+            handle_key_event(&source_placeholder, &state_sel, "backspace", false);
         assert_eq!(
             action_del_final,
             EditorAction::Edit {
-                range: 1..8, 
+                range: 1..8,
                 replacement: "".to_string(),
                 new_cursor: 1,
                 new_selection: None,
@@ -182,7 +191,10 @@ mod tests {
         let action1 = handle_key_event(&source, &state1, "backspace", false);
         assert_eq!(
             action1,
-            EditorAction::Select { range: 1..10, reversed: true }
+            EditorAction::Select {
+                range: 1..10,
+                reversed: true
+            }
         );
 
         // 2. Backspace after comma -> Selects whole root(?,?)
@@ -195,7 +207,10 @@ mod tests {
         let action2 = handle_key_event(&source, &state2, "backspace", false);
         assert_eq!(
             action2,
-            EditorAction::Select { range: 1..10, reversed: true }
+            EditorAction::Select {
+                range: 1..10,
+                reversed: true
+            }
         );
 
         // 3. Backspace when whole root(?,?) is selected -> Deletes it
@@ -231,7 +246,10 @@ mod tests {
         let action1 = handle_key_event(&source, &state1, "backspace", false);
         assert_eq!(
             action1,
-            EditorAction::Select { range: 1..4, reversed: true }
+            EditorAction::Select {
+                range: 1..4,
+                reversed: true
+            }
         );
 
         // 2. Backspace when whole ?/? is selected -> Deletes it
@@ -267,7 +285,10 @@ mod tests {
         let action1 = handle_key_event(&source, &state1, "right", false);
         assert_eq!(
             action1,
-            EditorAction::Select { range: 6..7, reversed: false }
+            EditorAction::Select {
+                range: 6..7,
+                reversed: false
+            }
         );
 
         // 2. Moving right when '?' is selected -> Moves past '?' to offset 7
@@ -278,10 +299,7 @@ mod tests {
             context: EditorContext::Math,
         };
         let action2 = handle_key_event(&source, &state2, "right", false);
-        assert_eq!(
-            action2,
-            EditorAction::MoveCursor { new_cursor: 7 }
-        );
+        assert_eq!(action2, EditorAction::MoveCursor { new_cursor: 7 });
 
         // 3. Moving left when cursor is after '?' -> Selects '?'
         let state3 = EditorState {
@@ -293,7 +311,10 @@ mod tests {
         let action3 = handle_key_event(&source, &state3, "left", false);
         assert_eq!(
             action3,
-            EditorAction::Select { range: 6..7, reversed: true }
+            EditorAction::Select {
+                range: 6..7,
+                reversed: true
+            }
         );
 
         // 4. Moving left when '?' is selected -> Moves past '?' to offset 6
@@ -304,17 +325,14 @@ mod tests {
             context: EditorContext::Math,
         };
         let action4 = handle_key_event(&source, &state4, "left", false);
-        assert_eq!(
-            action4,
-            EditorAction::MoveCursor { new_cursor: 6 }
-        );
+        assert_eq!(action4, EditorAction::MoveCursor { new_cursor: 6 });
     }
 
     #[test]
     fn test_math_whitespace_deletion() {
         // Source contains "2 x     + 1" where '2' is at 1, 'x' is at 3, spaces are 4..9, '+' is at 9.
         let source = Source::detached("$2 x     + 1$");
-        
+
         // 1. Backspace from middle/end of whitespace (offset 9) -> Collapses spaces 4..9 to a single space " "
         let state_bs = EditorState {
             text: source.text(),

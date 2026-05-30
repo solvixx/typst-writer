@@ -1,5 +1,5 @@
-use typst::text::Font;
 use typst::foundations::Bytes;
+use typst::text::Font;
 
 fn main() {
     println!("Extracting PostScript names for all typst-assets:");
@@ -10,11 +10,20 @@ fn main() {
             let mut ps_name = String::new();
             for n in font.ttf().names() {
                 if n.name_id == 6 {
-                    if let Some(s) = n.to_string() { ps_name = s; }
+                    if let Some(s) = n.to_string() {
+                        ps_name = s;
+                    }
                 }
             }
-            println!("Asset {} Face {}: PS='{}' Family='{}' W={:?} S={:?}", 
-                     idx, face_idx, ps_name, font.info().family, font.info().variant.weight, font.info().variant.style);
+            println!(
+                "Asset {} Face {}: PS='{}' Family='{}' W={:?} S={:?}",
+                idx,
+                face_idx,
+                ps_name,
+                font.info().family,
+                font.info().variant.weight,
+                font.info().variant.style
+            );
             face_idx += 1;
         }
     }

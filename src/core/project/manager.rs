@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
-use url::Url;
 use std::str::FromStr;
+use url::Url;
 
 /// Manages project-level state like working directory and main file.
 pub struct ProjectManager {

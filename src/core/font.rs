@@ -1,9 +1,9 @@
+use directories::ProjectDirs;
 use std::fs;
 use std::path::{Path, PathBuf};
-use directories::ProjectDirs;
 use std::process::Command;
-use typst::text::{Font as TypstFont, FontBook};
 use typst::foundations::Bytes;
+use typst::text::{Font as TypstFont, FontBook};
 use typst::utils::LazyHash;
 
 #[derive(Clone)]
@@ -34,7 +34,7 @@ impl FontManager {
     fn build() -> Self {
         let mut system_fonts = Vec::new();
         let mut book = FontBook::new();
-        
+
         // Index ONLY embedded fonts from typst-assets.
         // The user explicitly requested not to use system defaults.
         for font_bytes in typst_assets::fonts() {
@@ -60,7 +60,13 @@ impl FontManager {
         let mut db = fontdb::Database::new();
         db.load_system_fonts();
         for face in db.faces() {
-            if let (fontdb::Source::File(path), Ok(data)) = (&face.source, fs::read(match &face.source { fontdb::Source::File(p) => p, _ => unreachable!() })) {
+            if let (fontdb::Source::File(path), Ok(data)) = (
+                &face.source,
+                fs::read(match &face.source {
+                    fontdb::Source::File(p) => p,
+                    _ => unreachable!(),
+                }),
+            ) {
                 let bytes = Bytes::new(data.clone());
                 let mut face_idx = 0;
                 while let Some(font) = TypstFont::new(bytes.clone(), face_idx) {
@@ -81,11 +87,7 @@ impl FontManager {
         }
     }
 
-    fn load_fonts_from_dir(
-        dir: &Path,
-        book: &mut FontBook,
-        system_fonts: &mut Vec<SystemFont>,
-    ) {
+    fn load_fonts_from_dir(dir: &Path, book: &mut FontBook, system_fonts: &mut Vec<SystemFont>) {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.filter_map(Result::ok) {
                 let path = entry.path();
@@ -93,7 +95,12 @@ impl FontManager {
                     Self::load_fonts_from_dir(&path, book, system_fonts);
                 } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                     let ext_lower = ext.to_lowercase();
-                    if (ext_lower == "ttf" || ext_lower == "otf" || ext_lower == "ttc" || ext_lower == "otc") && fs::read(&path).is_ok() {
+                    if (ext_lower == "ttf"
+                        || ext_lower == "otf"
+                        || ext_lower == "ttc"
+                        || ext_lower == "otc")
+                        && fs::read(&path).is_ok()
+                    {
                         let data = fs::read(&path).unwrap();
                         let bytes = Bytes::new(data);
                         let mut face_idx = 0;
@@ -122,7 +129,7 @@ impl FontManager {
 
         // Font needs loading from index
         let slot = self.system_fonts.get(id)?;
-        
+
         let font = match &slot.source {
             FontSource::Embedded(data) => {
                 let bytes = Bytes::new(data.to_vec());
@@ -138,7 +145,7 @@ impl FontManager {
         // Cache loaded font for subsequent requests
         let mut write_guard = self.loaded_fonts.write().unwrap();
         write_guard.insert(id, font.clone());
-        
+
         Some(font)
     }
 }
@@ -150,7 +157,7 @@ pub fn provision_fonts() {
         let data_dir = proj_dirs.data_local_dir().join("fonts");
         provision_dirs.push(data_dir);
     }
-    
+
     // Add standard OS specific fallback paths just in case GPUI font loader looks there
     #[cfg(target_os = "linux")]
     if let Ok(home) = std::env::var("HOME") {
@@ -164,17 +171,18 @@ pub fn provision_fonts() {
 
     #[cfg(target_os = "windows")]
     if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-        provision_dirs.push(PathBuf::from(&local_app_data).join("Microsoft\\Windows\\Fonts\\TypstWriter"));
+        provision_dirs
+            .push(PathBuf::from(&local_app_data).join("Microsoft\\Windows\\Fonts\\TypstWriter"));
     }
 
     let mut provisioned_any = false;
-    
+
     for dir in &provision_dirs {
         let _ = fs::create_dir_all(dir);
         for (idx, font_bytes) in typst_assets::fonts().enumerate() {
             let file_name = format!("embedded_font_{}.otf", idx);
             let path = dir.join(&file_name);
-            
+
             if !path.exists() && fs::write(&path, font_bytes).is_ok() {
                 provisioned_any = true;
             }

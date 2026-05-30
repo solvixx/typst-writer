@@ -1,6 +1,6 @@
-use gpui::*;
-use gpui_component::select::{Select, SelectState, SearchableVec, SelectItem};
 use crate::ui::workspace::EditorWorkspace;
+use gpui::*;
+use gpui_component::select::{SearchableVec, Select, SelectItem, SelectState};
 
 pub struct CommandItem {
     pub name: String,
@@ -40,16 +40,28 @@ pub struct CommandPalette {
 }
 
 impl CommandPalette {
-    pub fn new(workspace: WeakEntity<EditorWorkspace>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        workspace: WeakEntity<EditorWorkspace>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let items = vec![
-            CommandItem { name: "Export PDF".to_string(), action: Box::new(ExportPdf) },
-            CommandItem { name: "Undo".to_string(), action: Box::new(Undo) },
-            CommandItem { name: "Redo".to_string(), action: Box::new(Redo) },
+            CommandItem {
+                name: "Export PDF".to_string(),
+                action: Box::new(ExportPdf),
+            },
+            CommandItem {
+                name: "Undo".to_string(),
+                action: Box::new(Undo),
+            },
+            CommandItem {
+                name: "Redo".to_string(),
+                action: Box::new(Redo),
+            },
         ];
 
         let select_state = cx.new(|cx| {
-            SelectState::new(SearchableVec::new(items), None, window, cx)
-                .searchable(true)
+            SelectState::new(SearchableVec::new(items), None, window, cx).searchable(true)
         });
 
         cx.subscribe(&select_state, |this, _, event, cx| {
@@ -58,9 +70,13 @@ impl CommandPalette {
                     cx.dispatch_action(item.action.as_ref());
                 }
             }
-        }).detach();
+        })
+        .detach();
 
-        Self { workspace, select_state }
+        Self {
+            workspace,
+            select_state,
+        }
     }
 }
 

@@ -1,9 +1,9 @@
 // From:
 // https://github.com/zed-industries/zed/blob/a8afc63a91f6b75528540dcffe73dc8ce0c92ad8/crates/gpui/examples/window_shadow.rs
 use gpui::{
-    canvas, div, point, prelude::FluentBuilder as _, px, AnyElement, App, Bounds, CursorStyle,
-    Decorations, Edges, HitboxBehavior, Hsla, InteractiveElement as _, IntoElement, MouseButton,
-    ParentElement, Pixels, Point, RenderOnce, ResizeEdge, Size, Styled as _, Window,
+    AnyElement, App, Bounds, CursorStyle, Decorations, Edges, HitboxBehavior, Hsla,
+    InteractiveElement as _, IntoElement, MouseButton, ParentElement, Pixels, Point, RenderOnce,
+    ResizeEdge, Size, Styled as _, Window, canvas, div, point, prelude::FluentBuilder as _, px,
 };
 
 use crate::ActiveTheme;
@@ -89,7 +89,8 @@ impl RenderOnce for WindowBorder {
                             move |_bounds, hitbox, window, _| {
                                 let mouse = window.mouse_position();
                                 let size = window.window_bounds().get_bounds().size;
-                                let Some(edge) = resize_edge(mouse, SHADOW_SIZE, size, tiling) else {
+                                let Some(edge) = resize_edge(mouse, SHADOW_SIZE, size, tiling)
+                                else {
                                     return;
                                 };
                                 window.set_cursor_style(
@@ -175,9 +176,14 @@ impl RenderOnce for WindowBorder {
     }
 }
 
-fn resize_edge(pos: Point<Pixels>, shadow_size: Pixels, size: Size<Pixels>, tiling: gpui::Tiling) -> Option<ResizeEdge> {
+fn resize_edge(
+    pos: Point<Pixels>,
+    shadow_size: Pixels,
+    size: Size<Pixels>,
+    tiling: gpui::Tiling,
+) -> Option<ResizeEdge> {
     let hit_size = shadow_size + px(4.0);
-    
+
     let can_top = !tiling.top;
     let can_bottom = !tiling.bottom;
     let can_left = !tiling.left;
@@ -191,7 +197,11 @@ fn resize_edge(pos: Point<Pixels>, shadow_size: Pixels, size: Size<Pixels>, tili
         ResizeEdge::Top
     } else if can_bottom && can_left && pos.y > size.height - hit_size && pos.x < hit_size {
         ResizeEdge::BottomLeft
-    } else if can_bottom && can_right && pos.y > size.height - hit_size && pos.x > size.width - hit_size {
+    } else if can_bottom
+        && can_right
+        && pos.y > size.height - hit_size
+        && pos.x > size.width - hit_size
+    {
         ResizeEdge::BottomRight
     } else if can_bottom && pos.y > size.height - hit_size {
         ResizeEdge::Bottom

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use futures::channel::oneshot;
 use gpui::{App, Task};
 use lsp_types::{
@@ -6,14 +6,14 @@ use lsp_types::{
     request::{self, Request},
     *,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Write},
     process::{ChildStdin, Command, Stdio},
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -33,11 +33,22 @@ impl LspClient {
             .stderr(Stdio::piped())
             .spawn()?;
 
-        let stdin = child.stdin.take().ok_or_else(|| anyhow!("failed to take stdin"))?;
-        let stdout = child.stdout.take().ok_or_else(|| anyhow!("failed to take stdout"))?;
-        let stderr = child.stderr.take().ok_or_else(|| anyhow!("failed to take stderr"))?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow!("failed to take stdin"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow!("failed to take stdout"))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| anyhow!("failed to take stderr"))?;
 
-        let pending_requests = Arc::new(Mutex::new(HashMap::<u64, oneshot::Sender<Result<Value>>>::new()));
+        let pending_requests = Arc::new(Mutex::new(
+            HashMap::<u64, oneshot::Sender<Result<Value>>>::new(),
+        ));
         let pending_requests_clone = pending_requests.clone();
 
         let read_task = cx.background_executor().spawn(async move {
@@ -56,12 +67,14 @@ impl LspClient {
         });
 
         // Suppress verbose stderr logs from LSP by consuming the stream
-        cx.background_executor().spawn(async move {
-            let reader = BufReader::new(stderr);
-            for _ in reader.lines() {
-                // Discard logs to avoid cluttering stderr
-            }
-        }).detach();
+        cx.background_executor()
+            .spawn(async move {
+                let reader = BufReader::new(stderr);
+                for _ in reader.lines() {
+                    // Discard logs to avoid cluttering stderr
+                }
+            })
+            .detach();
 
         Ok(Arc::new(Self {
             stdin: Mutex::new(stdin),
@@ -89,7 +102,9 @@ impl LspClient {
 
         self.send_message(&message)?;
 
-        let response = rx.await.map_err(|_| anyhow!("LSP response channel closed"))??;
+        let response = rx
+            .await
+            .map_err(|_| anyhow!("LSP response channel closed"))??;
         let result = serde_json::from_value(response)?;
         Ok(result)
     }
@@ -107,7 +122,12 @@ impl LspClient {
     fn send_message(&self, message: &Value) -> Result<()> {
         let content = serde_json::to_string(message)?;
         let mut stdin = self.stdin.lock().unwrap();
-        write!(stdin, "Content-Length: {}\r\n\r\n{}", content.len(), content)?;
+        write!(
+            stdin,
+            "Content-Length: {}\r\n\r\n{}",
+            content.len(),
+            content
+        )?;
         stdin.flush()?;
         Ok(())
     }

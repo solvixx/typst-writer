@@ -1,8 +1,8 @@
+use crate::core::lsp::LspClient;
 use anyhow::Result;
 use gpui::*;
-use gpui_component::input::{InputState, CompletionProvider, HoverProvider, Rope, RopeExt};
+use gpui_component::input::{CompletionProvider, HoverProvider, InputState, Rope, RopeExt};
 use lsp_types::*;
-use crate::core::lsp::LspClient;
 use std::sync::Arc;
 
 pub struct TypstLspProvider {
@@ -27,13 +27,12 @@ impl CompletionProvider for TypstLspProvider {
     ) -> Task<Result<CompletionResponse>> {
         let client = self.client.clone();
         let uri = self.file_uri.clone();
-        
+
         cx.spawn(move |state: WeakEntity<InputState>, cx: &mut AsyncApp| {
             let mut cx = cx.clone();
             async move {
-                let position = state.update(&mut cx, |state, _| {
-                    state.text().offset_to_position(offset)
-                })?;
+                let position =
+                    state.update(&mut cx, |state, _| state.text().offset_to_position(offset))?;
 
                 let params = CompletionParams {
                     text_document_position: TextDocumentPositionParams {

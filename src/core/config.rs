@@ -1,13 +1,15 @@
+use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use directories::ProjectDirs;
 
 fn default_max_log_lines() -> usize {
     1000
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
@@ -36,19 +38,31 @@ impl Default for AppConfig {
             font_size: 14.0,
             mono_font: {
                 #[cfg(target_os = "macos")]
-                { "Menlo".to_string() }
+                {
+                    "Menlo".to_string()
+                }
                 #[cfg(target_os = "windows")]
-                { "Consolas".to_string() }
+                {
+                    "Consolas".to_string()
+                }
                 #[cfg(target_os = "linux")]
-                { "DejaVu Sans Mono".to_string() }
+                {
+                    "DejaVu Sans Mono".to_string()
+                }
             },
             ui_font: {
                 #[cfg(target_os = "macos")]
-                { "SF Pro".to_string() }
+                {
+                    "SF Pro".to_string()
+                }
                 #[cfg(target_os = "windows")]
-                { "Segoe UI".to_string() }
+                {
+                    "Segoe UI".to_string()
+                }
                 #[cfg(target_os = "linux")]
-                { "Noto Sans".to_string() }
+                {
+                    "Noto Sans".to_string()
+                }
             },
             auto_compile: true,
             custom_font_paths: Vec::new(),
@@ -79,17 +93,19 @@ impl ConfigManager {
     pub fn load() -> AppConfig {
         if let Some(path) = Self::config_path()
             && path.exists()
-                && let Ok(contents) = fs::read_to_string(&path)
-                    && let Ok(config) = serde_json::from_str(&contents) {
-                        return config;
-                    }
+            && let Ok(contents) = fs::read_to_string(&path)
+            && let Ok(config) = serde_json::from_str(&contents)
+        {
+            return config;
+        }
         AppConfig::default()
     }
 
     pub fn save(config: &AppConfig) {
         if let Some(path) = Self::config_path()
-            && let Ok(json) = serde_json::to_string_pretty(config) {
-                let _ = fs::write(path, json);
-            }
+            && let Ok(json) = serde_json::to_string_pretty(config)
+        {
+            let _ = fs::write(path, json);
+        }
     }
 }

@@ -7,16 +7,16 @@ fn main() {
             fonts.push(std::borrow::Cow::Borrowed(font_bytes));
         }
         let _ = cx.text_system().add_fonts(fonts);
-        
+
         let ps_names = [
-            "LibertinusSerif-Regular", 
+            "LibertinusSerif-Regular",
             "LibertinusSerif-Bold",
             "LibertinusSerif-Semibold",
             "LibertinusSerif-SemiboldItalic",
             "NewCMMath-Book",
-            "NewCMMath-Regular"
+            "NewCMMath-Regular",
         ];
-        
+
         for ps in ps_names {
             let id = cx.text_system().resolve_font(&Font {
                 family: ps.into(),
@@ -27,7 +27,7 @@ fn main() {
             });
             println!("Resolved PS '{}' -> {:?}", ps, id);
         }
-        
+
         cx.quit();
     });
 }

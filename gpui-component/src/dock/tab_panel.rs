@@ -743,20 +743,17 @@ impl TabPanel {
                         .when(panel.closable(cx), |this| {
                             let panel = panel.clone();
                             this.suffix(
-                                h_flex()
-                                    .ml_1()
-                                    .pr_1()
-                                    .child(
-                                        Button::new(("close-tab", ix))
-                                            .icon(IconName::Close)
-                                            .xsmall()
-                                            .ghost()
-                                            .tab_stop(false)
-                                            .on_click(cx.listener(move |view, _, window, cx| {
-                                                cx.stop_propagation();
-                                                view.remove_panel(panel.clone(), window, cx);
-                                            })),
-                                    )
+                                h_flex().ml_1().pr_1().child(
+                                    Button::new(("close-tab", ix))
+                                        .icon(IconName::Close)
+                                        .xsmall()
+                                        .ghost()
+                                        .tab_stop(false)
+                                        .on_click(cx.listener(move |view, _, window, cx| {
+                                            cx.stop_propagation();
+                                            view.remove_panel(panel.clone(), window, cx);
+                                        })),
+                                ),
                             )
                         })
                         .on_click(cx.listener({
