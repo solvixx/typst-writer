@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build - ${{ matrix.platform.os-name }}
+    runs-on: ${{ matrix.platform.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - os: ubuntu-22.04
+            os-name: Linux
+            target: x86_64-unknown-linux-gnu
+            bin-name: typst-writer
+            package-suffix: .tar.gz
+          - os: windows-latest
+            os-name: Windows
+            target: x86_64-pc-windows-msvc
+            bin-name: typst-writer.exe
+            package-suffix: .zip
+          - os: macos-latest
+            os-name: macOS
+            target: x86_64-apple-darwin
+            bin-name: typst-writer
+            package-suffix: -intel.tar.gz
+          - os: macos-latest
+            os-name: macOS-Silicon
+            target: aarch64-apple-darwin
+            bin-name: typst-writer
+            package-suffix: -silicon.tar.gz
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies (Linux)
+        if: matrix.platform.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libdbus-1-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libx11-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libwayland-dev \
+            libasound2-dev \
+            libvulkan-dev \
+            libegl1-mesa-dev \
+            libgl1-mesa-dev
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.platform.target }}
+
+      - name: Build Optimized Release Binary
+        run: cargo build --release --target ${{ matrix.platform.target }}
+
+      - name: Package Binary (Linux & macOS)
+        if: matrix.platform.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.platform.target }}/release
+          tar -czf ../../../typst-writer-${{ github.ref_name }}-${{ matrix.platform.target }}${{ matrix.platform.package-suffix }} ${{ matrix.platform.bin-name }}
+          cd ../../..
+
+      - name: Package Binary (Windows)
+        if: matrix.platform.os == 'windows-latest'
+        shell: bash
+        run: |
+          cd target/${{ matrix.platform.target }}/release
+          7z a ../../../typst-writer-${{ github.ref_name }}-${{ matrix.platform.target }}${{ matrix.platform.package-suffix }} ${{ matrix.platform.bin-name }}
+          cd ../../..
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-writer-${{ matrix.platform.target }}
+          path: typst-writer-${{ github.ref_name }}-${{ matrix.platform.target }}${{ matrix.platform.package-suffix }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten Artifacts Directory
+        run: |
+          mkdir release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          ls -R release-assets
+
+      - name: Create Release Notes
+        run: |
+          echo "## Typst Writer ${{ github.ref_name }}" > release_notes.md
+          echo "Welcome to the latest release of **Typst Writer**! This release contains production-grade optimized builds for Linux, Windows, and macOS." >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### 📦 Installation" >> release_notes.md
+          echo "- **Linux**: Extract the tarball and run the binary directly." >> release_notes.md
+          echo "- **Windows**: Unzip and run \`typst-writer.exe\`." >> release_notes.md
+          echo "- **macOS**: Extract and run \`typst-writer\`." >> release_notes.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          files: release-assets/*
+          draft: true
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,1 +1,10 @@
 /target
+**/*.rs.bk
+*.log
+*.pdf
+*.json
+!Cargo.json
+!.github/**/*.json
+/visual_compare/
+.DS_Store
+.directory
