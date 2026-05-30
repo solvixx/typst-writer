@@ -122,7 +122,7 @@ impl SourceEditorView {
                         let mut cx = cx.clone();
                         async move {
                             cx.background_executor()
-                                .timer(std::time::Duration::from_millis(150))
+                                .timer(std::time::Duration::from_millis(50))
                                 .await;
                             
                             this_weak.update(&mut cx, |this, _cx| {

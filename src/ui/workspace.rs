@@ -255,7 +255,7 @@ impl EditorWorkspace {
             let mut cx = cx.clone();
             async move {
                 cx.background_executor()
-                    .timer(Duration::from_millis(250))
+                    .timer(Duration::from_millis(50))
                     .await;
                 this_weak
                     .update(&mut cx, |this, cx| {
