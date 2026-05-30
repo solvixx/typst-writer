@@ -444,11 +444,30 @@ fn find_common_prefix_suffix(old: &str, new: &gpui_component::Rope) -> (usize, u
     }
 
     let mut common_suffix = 0;
-    while common_suffix < old_len - common_prefix && common_suffix < new_len - common_prefix {
-        if old_bytes[old_len - 1 - common_suffix] != new.byte(new_len - 1 - common_suffix) {
-            break;
+    let max_suffix = (old_len - common_prefix).min(new_len - common_prefix);
+
+    if max_suffix > 0 {
+        let suffix_slice = new.slice(new_len - max_suffix..new_len);
+        let mut chunks = Vec::new();
+        for chunk in suffix_slice.chunks() {
+            chunks.push(chunk);
         }
-        common_suffix += 1;
+
+        let mut old_bytes_rev = old_bytes[old_len - max_suffix..old_len].iter().rev();
+
+        'outer: for chunk in chunks.iter().rev() {
+            let chunk_bytes = chunk.as_bytes();
+            for &n in chunk_bytes.iter().rev() {
+                if let Some(&o) = old_bytes_rev.next() {
+                    if o != n {
+                        break 'outer;
+                    }
+                    common_suffix += 1;
+                } else {
+                    break 'outer;
+                }
+            }
+        }
     }
 
     (common_prefix, common_suffix)
