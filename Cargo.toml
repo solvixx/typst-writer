@@ -2,6 +2,12 @@
 name = "typst-writer"
 version = "0.1.0"
 edition = "2024"
+authors = ["solvixx"]
+description = "A high-performance, cross-platform Typst IDE built with GPUI"
+repository = "https://github.com/solvixx/typst-writer"
+license = "MIT"
+keywords = ["typst", "editor", "ide", "gpui"]
+categories = ["text-editors"]
 
 [lib]
 path = "src/lib.rs"
