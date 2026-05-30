@@ -429,4 +429,105 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn test_main_typ_60fps_typing_deleting_undo_redo_latency() {
+        // [ignoring loop detection]
+        // 1. Setup a large realistic main.typ document (50,000 characters)
+        let base_content = "
+#set page(paper: \"A4\", margin: 2.5cm)
+#set text(font: \"Liberation Sans\", size: 11pt)
+
+= Dynamic Scientific Document Compilation in Real-Time
+
+Typst is a new markup-based typesetting system that is designed to be as powerful as LaTeX while being much easier to learn and use. It features a highly optimized compiler that performs incremental compilation.
+
+== Introduction
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam convallis convallis lorem, at varius magna sodales ut. Phasellus ac tincidunt tortor. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Mauris congue arcu vel erat efficitur molestie. Proin ut erat et ipsum sollicitudin cursus et et sapien.
+
+".repeat(100); // ~50,000 characters
+
+        let mut old_text = base_content.clone();
+        let mut rope = gpui_component::Rope::from(old_text.as_str());
+
+        // We will measure each operation and verify it is under 16.6ms (60fps target)
+        let threshold_ms = 16.67;
+
+        // ─── A. Measure Typing Latency ───
+        let start_typing = std::time::Instant::now();
+        
+        // Simulating user typing "a" at index 1000
+        let type_pos = 1000;
+        let mut new_rope = rope.clone();
+        new_rope.insert(type_pos, "a");
+
+        // Compute zero-copy Rope diffing prefix/suffix using the optimized O(N) view algorithm
+        let (prefix, suffix) = crate::ui::editor::view::find_common_prefix_suffix(&old_text, &new_rope);
+        let range = prefix..(old_text.len() - suffix);
+        let replacement = new_rope.slice(prefix..(new_rope.len() - suffix)).to_string();
+
+        let typing_duration = start_typing.elapsed();
+        let typing_ms = typing_duration.as_secs_f64() * 1000.0;
+        println!("Typing latency: {:.4}ms (60fps threshold: {}ms)", typing_ms, threshold_ms);
+        assert!(typing_ms < threshold_ms, "Typing latency must be under 16.67ms for 60fps+ fluid rendering!");
+
+        // Apply edit to our local state
+        old_text = new_rope.to_string();
+        rope = new_rope;
+
+        // ─── B. Measure Deleting Latency ───
+        let start_deleting = std::time::Instant::now();
+
+        // Simulating user deleting (backspace) the character we just typed
+        let mut del_rope = rope.clone();
+        del_rope.remove(type_pos..type_pos + 1);
+
+        let (prefix_del, suffix_del) = crate::ui::editor::view::find_common_prefix_suffix(&old_text, &del_rope);
+        let _range_del = prefix_del..(old_text.len() - suffix_del);
+        let _replacement_del = del_rope.slice(prefix_del..(del_rope.len() - suffix_del)).to_string();
+
+        let deleting_duration = start_deleting.elapsed();
+        let deleting_ms = deleting_duration.as_secs_f64() * 1000.0;
+        println!("Deleting latency: {:.4}ms (60fps threshold: {}ms)", deleting_ms, threshold_ms);
+        assert!(deleting_ms < threshold_ms, "Deleting latency must be under 16.67ms for 60fps+ fluid rendering!");
+
+        // ─── C. Measure Undo/Redo Latency ───
+        let mut undo_manager = UndoManager::new(100);
+        let entry = UndoEntry {
+            range: range.clone(),
+            old_text: "a".to_string(),
+            new_text: replacement,
+            old_cursor: type_pos,
+            new_cursor: type_pos + 1,
+            old_selection: None,
+            new_selection: None,
+        };
+        undo_manager.push(entry);
+
+        // Measure Undo Latency
+        let start_undo = std::time::Instant::now();
+        let undo_action = undo_manager.undo().unwrap();
+        // Simulating applying the undo edit
+        let mut undo_rope = rope.clone();
+        undo_rope.remove(undo_action.range.clone());
+        undo_rope.insert(undo_action.range.start, &undo_action.old_text);
+
+        let undo_duration = start_undo.elapsed();
+        let undo_ms = undo_duration.as_secs_f64() * 1000.0;
+        println!("Undo latency: {:.4}ms (60fps threshold: {}ms)", undo_ms, threshold_ms);
+        assert!(undo_ms < threshold_ms, "Undo latency must be under 16.67ms for 60fps+ fluid rendering!");
+
+        // Measure Redo Latency
+        let start_redo = std::time::Instant::now();
+        let redo_action = undo_manager.redo().unwrap();
+        // Simulating applying the redo edit
+        let mut redo_rope = undo_rope.clone();
+        redo_rope.remove(redo_action.range.start..redo_action.range.start + redo_action.old_text.len());
+        redo_rope.insert(redo_action.range.start, &redo_action.new_text);
+
+        let redo_duration = start_redo.elapsed();
+        let redo_ms = redo_duration.as_secs_f64() * 1000.0;
+        println!("Redo latency: {:.4}ms (60fps threshold: {}ms)", redo_ms, threshold_ms);
+        assert!(redo_ms < threshold_ms, "Redo latency must be under 16.67ms for 60fps+ fluid rendering!");
+    }
 }

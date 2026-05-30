@@ -453,7 +453,7 @@ fn rope_eq_str(rope: &gpui_component::Rope, s: &str) -> bool {
     true
 }
 
-fn find_common_prefix_suffix(old: &str, new: &gpui_component::Rope) -> (usize, usize) {
+pub(crate) fn find_common_prefix_suffix(old: &str, new: &gpui_component::Rope) -> (usize, usize) {
     let old_bytes = old.as_bytes();
     let old_len = old_bytes.len();
     let new_len = new.len();
@@ -517,4 +517,6 @@ fn byte_offset_to_lsp_position(text: &str, offset: usize) -> lsp_types::Position
 
     lsp_types::Position { line, character }
 }
+
+
 
