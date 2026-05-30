@@ -5,6 +5,8 @@
 *.json
 !Cargo.json
 !.github/**/*.json
+!gpui-component/src/theme/default-colors.json
+!gpui-component/src/theme/default-theme.json
 /visual_compare/
 .DS_Store
 .directory
