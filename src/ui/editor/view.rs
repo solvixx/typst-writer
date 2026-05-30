@@ -121,10 +121,9 @@ impl SourceEditorView {
                             cx.background_executor()
                                 .timer(std::time::Duration::from_millis(150))
                                 .await;
-                            let text = cx
-                                .background_executor()
-                                .spawn(async move { text_rope_clone.to_string() })
-                                .await;
+                            
+                            // Only perform the expensive conversion once ready to send to LSP
+                            let text = text_rope_clone.to_string();
                             let _ = client.did_change(DidChangeTextDocumentParams {
                                 text_document: VersionedTextDocumentIdentifier {
                                     uri: uri_clone,
