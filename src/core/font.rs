@@ -1,6 +1,8 @@
 use directories::ProjectDirs;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
+use std::process::Command;
 use typst::foundations::Bytes;
 use typst::text::{Font as TypstFont, FontBook};
 use typst::utils::LazyHash;
