@@ -103,3 +103,6 @@ strip = true
 - **`opt-level = 3`**: Enables full compiler optimizations.
 - **`lto = true`**: Enables Link-Time Optimization (LTO) across all crates for maximum binary speed.
 - **`strip = true`**: Automatically strips symbol tables and debug information, slashing executable sizes by up to 80% for seamless distribution.
+
+
+## NOTICE: I will not be able to maintain this project anymore. I am handing over the project to the community. Please fork this repository and continue the development. Thanks for your support.
