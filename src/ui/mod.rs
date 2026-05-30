@@ -219,14 +219,28 @@ pub fn patch_font_family_safe(data: &mut [u8], font_id: u32, face_idx: u32) {
     }
 }
 
+static FONT_PTR_REGISTRY: OnceLock<Mutex<HashMap<u64, FontId>>> = OnceLock::new();
+
+pub fn get_ptr_registry() -> &'static Mutex<HashMap<u64, FontId>> {
+    FONT_PTR_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 pub fn load_ui_fonts(_cx: &mut gpui::App) {
     // Dynamic font loading handles everything lazily now.
 }
 
 pub fn resolve_typst_font(cx: &mut gpui::App, font: &typst::text::Font) -> Option<FontId> {
+    let data_ptr = font.ttf().raw_face().data.as_ptr() as u64;
+
+    // 1. Direct O(1) pointer-based resolution path (Global TTF byte pointer lookup)
+    if let Some(&id) = get_ptr_registry().lock().unwrap().get(&data_ptr) {
+        return Some(id);
+    }
+
     let ps = read_postscript_name(&font.ttf());
 
     if let Some(id) = gpui_font_id_by_postscript_name(&ps) {
+        get_ptr_registry().lock().unwrap().insert(data_ptr, id);
         return Some(id);
     }
 
@@ -266,5 +280,6 @@ pub fn resolve_typst_font(cx: &mut gpui::App, font: &typst::text::Font) -> Optio
     });
 
     get_registry().lock().unwrap().insert(ps.clone(), font_id);
+    get_ptr_registry().lock().unwrap().insert(data_ptr, font_id);
     Some(font_id)
 }
