@@ -1098,18 +1098,9 @@ impl EditorWorkspace {
                 if scroll_to_caret {
                     let h = height;
                     let renderer = self._renderer.clone();
-                    cx.spawn(move |_, cx: &mut AsyncApp| {
-                        let cx = cx.clone();
-                        async move {
-                            cx.update(|cx| {
-                                renderer.update(cx, |renderer, cx| {
-                                    renderer.scroll_to_caret(page_idx, pos, h, cx);
-                                });
-                            })
-                            .ok();
-                        }
-                    })
-                    .detach();
+                    renderer.update(cx, |renderer, cx| {
+                        renderer.scroll_to_caret(page_idx, pos, h, cx);
+                    });
                 }
             }
         }
