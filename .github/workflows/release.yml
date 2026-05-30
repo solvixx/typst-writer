@@ -73,8 +73,11 @@ jobs:
         run: |
           mkdir -p .cargo
           echo '[target.x86_64-unknown-linux-gnu]' > .cargo/config.toml
-          echo 'linker = "x86_64-linux-gnu-gcc"' >> .cargo/config.toml
+          # Use the system linker directly
+          echo 'linker = "/usr/bin/x86_64-linux-gnu-gcc"' >> .cargo/config.toml
           echo 'rustflags = ["-C", "link-arg=-fuse-ld=lld"]' >> .cargo/config.toml
+          # Ensure ld is found
+          sudo ln -sf /usr/bin/x86_64-linux-gnu-ld.bfd /usr/bin/ld
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2

@@ -115,7 +115,7 @@ impl SourceEditorView {
                     this.lsp_sync_task = None;
                     
                     let new_text = text_rope.clone();
-                    let old_text = this.last_text.clone();
+                    let _old_text = this.last_text.clone();
                     let uri_clone = this.uri.clone();
                     
                     this.lsp_sync_task = Some(cx.spawn(move |_, cx: &mut AsyncApp| {
