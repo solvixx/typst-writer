@@ -112,11 +112,11 @@ impl Ribbon {
                                 };
                                 let start = clamp_to_char_boundary(
                                     sel_start.min(sel_end).min(current_text.len()),
-                                    &current_text,
+                                    current_text,
                                 );
                                 let end = clamp_to_char_boundary(
                                     sel_start.max(sel_end).min(current_text.len()),
-                                    &current_text,
+                                    current_text,
                                 );
 
                                 // 1. Check Case A1: Wrapped by same shorthand inside selection
@@ -125,19 +125,19 @@ impl Ribbon {
                                     && current_text[..end].ends_with(symbol);
 
                                 // 2. Check Case A2: Wrapped by same function inside selection
-                                let has_func_inside = (end - start >= func_open.len() + 1)
+                                let has_func_inside = (end - start > func_open.len())
                                     && current_text[start..].starts_with(func_open)
                                     && current_text[..end].ends_with(']');
 
                                 // 3. Check Case B1: Wrapped by same shorthand outside selection
                                 let has_shorthand_outside = start >= 1
-                                    && end + 1 <= current_text.len()
+                                    && end < current_text.len()
                                     && current_text[..start].ends_with(symbol)
                                     && current_text[end..].starts_with(symbol);
 
                                 // 4. Check Case B2: Wrapped by same function outside selection
                                 let has_func_outside = start >= func_open.len()
-                                    && end + 1 <= current_text.len()
+                                    && end < current_text.len()
                                     && current_text[..start].ends_with(func_open)
                                     && current_text[end..].starts_with(']');
 
@@ -236,9 +236,9 @@ impl Ribbon {
                                 };
 
                                 let left_is_alphanumeric =
-                                    left_char.map_or(false, |c| c.is_alphanumeric());
+                                    left_char.is_some_and(|c| c.is_alphanumeric());
                                 let right_is_alphanumeric =
-                                    right_char.map_or(false, |c| c.is_alphanumeric());
+                                    right_char.is_some_and(|c| c.is_alphanumeric());
 
                                 if left_is_alphanumeric || right_is_alphanumeric {
                                     // Use high-fidelity function syntax fallback

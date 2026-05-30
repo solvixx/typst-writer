@@ -65,10 +65,10 @@ impl CommandPalette {
         });
 
         cx.subscribe(&select_state, |this, _, event, cx| {
-            if let gpui_component::select::SelectEvent::Confirm(Some(item)) = event {
-                if let Some(_ws) = this.workspace.upgrade() {
-                    cx.dispatch_action(item.action.as_ref());
-                }
+            if let gpui_component::select::SelectEvent::Confirm(Some(item)) = event
+                && let Some(_ws) = this.workspace.upgrade()
+            {
+                cx.dispatch_action(item.action.as_ref());
             }
         })
         .detach();

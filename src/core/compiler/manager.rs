@@ -25,6 +25,19 @@ pub struct CompilerManager {
     compilation_task: Option<Task<()>>,
 }
 
+pub struct CompilationMetadata {
+    pub doc: Arc<PagedDocument>,
+    pub warnings: usize,
+    pub structural_ranges: Vec<Range<usize>>,
+    pub structural_hash: u64,
+}
+
+impl Default for CompilerManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CompilerManager {
     pub fn new() -> Self {
         Self {
@@ -45,7 +58,7 @@ impl CompilerManager {
         world: SimpleWorld,
         view_weak: WeakEntity<V>,
         cx: &mut gpui::Context<V>,
-        on_success: impl FnOnce(&mut V, Arc<PagedDocument>, usize, &mut gpui::Context<V>)
+        on_success: impl FnOnce(&mut V, CompilationMetadata, &mut gpui::Context<V>)
         + 'static
         + Send,
     ) {
@@ -58,20 +71,41 @@ impl CompilerManager {
         self.needs_recompile = false;
 
         let world_clone = world.clone();
+        let old_structural_ranges = self.structural_ranges.clone();
+        let old_structural_hash = self.structural_hash;
 
         self.compilation_task = Some(cx.spawn(move |_, cx: &mut AsyncApp| {
             let mut cx = cx.clone();
             async move {
-                let start = std::time::Instant::now();
                 let result = typst::compile::<PagedDocument>(&world_clone);
-                let _duration = start.elapsed();
+                
+                // BACKGROUND: Extract structural metadata while still on the background thread
+                let (structural_ranges, structural_hash) = if result.output.is_ok() {
+                    let text = world_clone.main_source.text();
+                    let mut ranges = old_structural_ranges;
+                    let mut hash = old_structural_hash;
+                    
+                    let new_hash = hash_text_regions(text, &ranges);
+                    if new_hash != hash {
+                        ranges = extract_structural_ranges(text);
+                        hash = hash_text_regions(text, &ranges);
+                    }
+                    (ranges, hash)
+                } else {
+                    (old_structural_ranges, old_structural_hash)
+                };
 
                 view_weak
                     .update(&mut cx, |view, cx| {
                         match result.output {
                             Ok(doc) => {
-                                let doc_arc = Arc::new(doc);
-                                on_success(view, doc_arc, result.warnings.len(), cx);
+                                let metadata = CompilationMetadata {
+                                    doc: Arc::new(doc),
+                                    warnings: result.warnings.len(),
+                                    structural_ranges,
+                                    structural_hash,
+                                };
+                                on_success(view, metadata, cx);
                             }
                             Err(_diags) => {
                                 // Diagnostics are handled by the caller or specialized callback
@@ -84,14 +118,23 @@ impl CompilerManager {
     }
 
     /// Updates the structural hash and re-extracts ranges if needed.
-    pub fn update_structural_metadata(&mut self, text: &str) -> bool {
-        let new_hash = hash_text_regions(text, &self.structural_ranges);
-        if new_hash != self.structural_hash {
-            self.structural_ranges = extract_structural_ranges(text);
-            self.structural_hash = hash_text_regions(text, &self.structural_ranges);
+    /// Returns true if updated.
+    pub fn apply_structural_metadata(&mut self, ranges: Vec<Range<usize>>, hash: u64) -> bool {
+        if hash != self.structural_hash {
+            self.structural_ranges = ranges;
+            self.structural_hash = hash;
             return true;
         }
         false
+    }
+
+    /// Updates the structural hash and re-extracts ranges if needed from the provided text.
+    pub fn update_structural_metadata(&mut self, text: &str) {
+        let current_hash = hash_text_regions(text, &self.structural_ranges);
+        if current_hash != self.structural_hash {
+            self.structural_ranges = extract_structural_ranges(text);
+            self.structural_hash = hash_text_regions(text, &self.structural_ranges);
+        }
     }
 }
 

@@ -70,7 +70,7 @@ impl FileTree {
         }
     }
 
-    pub fn refresh(tree_state: &Entity<TreeState>, root: &PathBuf, cx: &mut App) {
+    pub fn refresh(tree_state: &Entity<TreeState>, root: &Path, cx: &mut App) {
         let items = Self::load_level(root);
         tree_state.update(cx, |state, cx| {
             state.set_items(items, cx);
@@ -359,12 +359,12 @@ impl FileTree {
                 let file_name = file_name.clone();
                 move |_, event: &InputEvent, _window, cx| {
                     if let Some(this) = this_weak.upgrade() {
-                        let _ = this.update(cx, |this, cx| {
+                        this.update(cx, |this, cx| {
                             match event {
                                 InputEvent::PressEnter { .. } => {
                                     let new_name = this.editing_input.as_ref().unwrap().read(cx).text().to_string().trim().to_string();
-                                    if !new_name.is_empty() && new_name != file_name {
-                                        if let Some(parent) = old_path.parent() {
+                                    if !new_name.is_empty() && new_name != file_name
+                                        && let Some(parent) = old_path.parent() {
                                             let new_path = parent.join(&new_name);
                                             if std::fs::rename(&old_path, &new_path).is_ok() {
                                                 Self::refresh(&this.tree_state, &this.root, cx);
@@ -413,7 +413,6 @@ impl FileTree {
                                                 }
                                             }
                                         }
-                                    }
                                     this.editing_path = None;
                                     this.editing_input = None;
                                     this._rename_subscription = None;
@@ -441,8 +440,8 @@ impl FileTree {
 
     fn handle_duplicate(&self, window: &mut Window, cx: &mut Context<Self>) {
         let selected = self.tree_state.read(cx).selected_entry();
-        if let Some(entry) = selected {
-            if !entry.is_folder() {
+        if let Some(entry) = selected
+            && !entry.is_folder() {
                 let path_str = entry.item().id.to_string();
                 let p = Path::new(&path_str).to_path_buf();
 
@@ -487,14 +486,13 @@ impl FileTree {
                             move |_, _, cx| {
                                 let new_name =
                                     input_state.read(cx).text().to_string().trim().to_string();
-                                if !new_name.is_empty() && new_name != name_original {
-                                    if let Some(parent) = old_path.parent() {
+                                if !new_name.is_empty() && new_name != name_original
+                                    && let Some(parent) = old_path.parent() {
                                         let new_path = parent.join(new_name);
                                         if std::fs::copy(&old_path, &new_path).is_ok() {
                                             Self::refresh(&tree_state, &root, cx);
                                         }
                                     }
-                                }
                                 true
                             }
                         })
@@ -506,13 +504,12 @@ impl FileTree {
                         )
                 });
             }
-        }
     }
 
     fn handle_open(&self, window: &mut Window, cx: &mut App) {
         let selected = self.tree_state.read(cx).selected_entry();
-        if let Some(entry) = selected {
-            if !entry.is_folder() {
+        if let Some(entry) = selected
+            && !entry.is_folder() {
                 let path_str = entry.item().id.to_string();
                 if let Some(workspace) = self._workspace.upgrade() {
                     workspace.update(cx, |workspace, cx| {
@@ -520,7 +517,6 @@ impl FileTree {
                     });
                 }
             }
-        }
     }
 }
 
@@ -576,12 +572,10 @@ impl Render for FileTree {
                                 move |_, window, cx| {
                                     // Focus the tree so the key context and actions work perfectly
                                     file_tree_state_click.read(cx).focus_handle().focus(window);
-                                    if !is_folder {
-                                        if let Some(workspace) = workspace.upgrade() {
+                                    if !is_folder && let Some(workspace) = workspace.upgrade() {
                                             workspace.update(cx, |workspace, cx| {
                                                 workspace.open_file(&path_str, window, cx);
                                             });
-                                        }
                                     }
                                 }
                             })
@@ -594,7 +588,6 @@ impl Render for FileTree {
                                             .context_menu({
                                                 let tree_state = file_tree_state.clone();
                                                 let focus_handle = focus_handle_for_menu.clone();
-                                                let is_folder = is_folder;
                                                 let this_weak = this_weak.clone();
                                                 move |menu, window, cx| {
                                                     // Select this item automatically on right click
@@ -614,23 +607,23 @@ impl Render for FileTree {
                                                         menu
                                                             .item(PopupMenuItem::new("New File").action(Box::new(NewFile)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| this.handle_new_file(window, cx));
+                                                                    this.update(cx, |this, cx| this.handle_new_file(window, cx));
                                                                 }
                                                             }))
                                                             .item(PopupMenuItem::new("New Folder").action(Box::new(NewFolder)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak2.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| this.handle_new_folder(window, cx));
+                                                                    this.update(cx, |this, cx| this.handle_new_folder(window, cx));
                                                                 }
                                                             }))
                                                             .separator()
                                                             .item(PopupMenuItem::new("Rename").action(Box::new(Rename)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak3.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| this.handle_rename(window, cx));
+                                                                    this.update(cx, |this, cx| this.handle_rename(window, cx));
                                                                 }
                                                             }))
                                                             .item(PopupMenuItem::new("Delete").action(Box::new(Delete)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak4.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| this.handle_delete(window, cx));
+                                                                    this.update(cx, |this, cx| this.handle_delete(window, cx));
                                                                 }
                                                             }))
                                                     } else {
@@ -641,25 +634,25 @@ impl Render for FileTree {
                                                         menu
                                                             .item(PopupMenuItem::new("Open File").action(Box::new(Open)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| {
+                                                                    this.update(cx, |this, cx| {
                                                                         this.handle_open(window, &mut *cx);
                                                                     });
                                                                 }
                                                             }))
                                                             .item(PopupMenuItem::new("Duplicate").action(Box::new(Duplicate)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak2.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| this.handle_duplicate(window, cx));
+                                                                    this.update(cx, |this, cx| this.handle_duplicate(window, cx));
                                                                 }
                                                             }))
                                                             .separator()
                                                             .item(PopupMenuItem::new("Rename").action(Box::new(Rename)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak3.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| this.handle_rename(window, cx));
+                                                                    this.update(cx, |this, cx| this.handle_rename(window, cx));
                                                                 }
                                                             }))
                                                             .item(PopupMenuItem::new("Delete").action(Box::new(Delete)).on_click(move |_, window, cx| {
                                                                 if let Some(this) = this_weak4.upgrade() {
-                                                                    let _ = this.update(cx, |this, cx| this.handle_delete(window, cx));
+                                                                    this.update(cx, |this, cx| this.handle_delete(window, cx));
                                                                 }
                                                             }))
                                                     }
