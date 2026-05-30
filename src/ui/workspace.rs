@@ -224,7 +224,6 @@ impl EditorWorkspace {
             logs: Vec::new(),
             _show_logs: config.log_panel_visible,
             undo_manager: crate::core::editor::UndoManager::new(200),
-            command_palette: None,
             _lsp_client: lsp_client,
             document_version: 0,
             #[cfg(debug_assertions)]
