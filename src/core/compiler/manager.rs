@@ -106,11 +106,22 @@ pub fn extract_structural_ranges(text: &str) -> Vec<Range<usize>> {
 
     let mut stack = vec![linked];
     while let Some(node) = stack.pop() {
-        for child in node.children() {
-            stack.push(child);
-        }
-
         match node.kind() {
+            SyntaxKind::Text
+            | SyntaxKind::Space
+            | SyntaxKind::Parbreak
+            | SyntaxKind::Linebreak
+            | SyntaxKind::Escape
+            | SyntaxKind::Shorthand
+            | SyntaxKind::SmartQuote
+            | SyntaxKind::Math
+            | SyntaxKind::Equation
+            | SyntaxKind::LineComment
+            | SyntaxKind::BlockComment
+            | SyntaxKind::Raw => {
+                // Prune non-structural text, math, raw, space, and comment subtrees
+                continue;
+            }
             SyntaxKind::SetRule
             | SyntaxKind::ShowRule
             | SyntaxKind::ModuleImport
@@ -120,16 +131,23 @@ pub fn extract_structural_ranges(text: &str) -> Vec<Range<usize>> {
             | SyntaxKind::Heading
             | SyntaxKind::Label => {
                 ranges.push(node.range());
+                // Do not traverse children of structural nodes either
+                continue;
             }
             SyntaxKind::FuncCall => {
                 if let Some(ident_node) = node.children().find(|c| c.kind() == SyntaxKind::Ident) {
                     let name = &text[ident_node.range()];
                     if name == "bibliography" || name == "figure" {
                         ranges.push(node.range());
+                        continue;
                     }
                 }
             }
             _ => {}
+        }
+
+        for child in node.children() {
+            stack.push(child);
         }
     }
     ranges
