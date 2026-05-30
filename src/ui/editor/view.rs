@@ -24,6 +24,7 @@ pub struct SourceEditorView {
     // Dirty tracking
     pub saved_text: gpui_component::Rope,
     pub is_dirty: bool,
+    last_synced_text: String,
 }
 
 impl SourceEditorView {
@@ -66,7 +67,7 @@ impl SourceEditorView {
                     uri: uri.clone(),
                     language_id: "typst".to_string(),
                     version: 0,
-                    text: initial_text,
+                    text: initial_text.clone(),
                 },
             });
         }
@@ -110,36 +111,58 @@ impl SourceEditorView {
                     }
                 }
 
-                if content_changed && let Some(client) = lsp_client.clone() {
+                if content_changed && lsp_client.is_some() {
                     // DEBOUNCED LSP SYNC
                     this.lsp_sync_task = None;
                     
                     let new_text = text_rope.clone();
-                    let _old_text = this.last_text.clone();
                     let uri_clone = this.uri.clone();
                     
-                    this.lsp_sync_task = Some(cx.spawn(move |_, cx: &mut AsyncApp| {
-                        let cx = cx.clone();
+                    this.lsp_sync_task = Some(cx.spawn(move |this_weak: WeakEntity<SourceEditorView>, cx: &mut AsyncApp| {
+                        let mut cx = cx.clone();
                         async move {
                             cx.background_executor()
                                 .timer(std::time::Duration::from_millis(150))
                                 .await;
                             
-                            // Calculate simple diff (placeholder for full rope diff logic)
-                            // In a production scenario, use ropey::Rope::diff or similar
-                            let text = new_text.to_string();
-                            
-                            let _ = client.did_change(DidChangeTextDocumentParams {
-                                text_document: VersionedTextDocumentIdentifier {
-                                    uri: uri_clone,
-                                    version: 0,
-                                },
-                                content_changes: vec![TextDocumentContentChangeEvent {
-                                    range: None, // Keep as None for now as full rope diff implementation is complex
-                                    range_length: None,
-                                    text,
-                                }],
-                            });
+                            this_weak.update(&mut cx, |this, _cx| {
+                                let new_text_rope = new_text.clone();
+                                let old_text = &this.last_synced_text;
+
+                                if !rope_eq_str(&new_text_rope, old_text) {
+                                    let (common_prefix, common_suffix) =
+                                        find_common_prefix_suffix(old_text, &new_text_rope);
+
+                                    let range = common_prefix..(old_text.len() - common_suffix);
+                                    let replacement = new_text_rope
+                                        .slice(common_prefix..(new_text_rope.len() - common_suffix))
+                                        .to_string();
+
+                                    let start_position = byte_offset_to_lsp_position(old_text, range.start);
+                                    let end_position = byte_offset_to_lsp_position(old_text, range.end);
+
+                                    let lsp_range = lsp_types::Range {
+                                        start: start_position,
+                                        end: end_position,
+                                    };
+
+                                    if let Some(client) = &this.lsp_client {
+                                        let _ = client.did_change(DidChangeTextDocumentParams {
+                                            text_document: VersionedTextDocumentIdentifier {
+                                                uri: uri_clone,
+                                                version: 0,
+                                            },
+                                            content_changes: vec![TextDocumentContentChangeEvent {
+                                                range: Some(lsp_range),
+                                                range_length: None,
+                                                text: replacement,
+                                            }],
+                                        });
+                                    }
+
+                                    this.last_synced_text = new_text_rope.to_string();
+                                }
+                            }).ok();
                         }
                     }));
                 }
@@ -244,6 +267,7 @@ impl SourceEditorView {
             lsp_sync_task: None,
             saved_text: initial_text_rope,
             is_dirty: false,
+            last_synced_text: initial_text.clone(),
         }
     }
 
@@ -405,24 +429,21 @@ fn rope_eq_str(rope: &gpui_component::Rope, s: &str) -> bool {
 
 fn find_common_prefix_suffix(old: &str, new: &gpui_component::Rope) -> (usize, usize) {
     let old_bytes = old.as_bytes();
-    let mut common_prefix = 0;
-
-    // Prefix
-    for (i, b) in old_bytes.iter().enumerate() {
-        if i >= new.len() {
-            break;
-        }
-        if *b != new.byte(i) {
-            break;
-        }
-        common_prefix = i + 1;
-    }
-
-    // Suffix
-    let mut common_suffix = 0;
     let old_len = old_bytes.len();
     let new_len = new.len();
 
+    let mut common_prefix = 0;
+    let mut old_iter = old_bytes.iter();
+    let mut new_iter = new.bytes();
+
+    while let (Some(&o), Some(n)) = (old_iter.next(), new_iter.next()) {
+        if o != n {
+            break;
+        }
+        common_prefix += 1;
+    }
+
+    let mut common_suffix = 0;
     while common_suffix < old_len - common_prefix && common_suffix < new_len - common_prefix {
         if old_bytes[old_len - 1 - common_suffix] != new.byte(new_len - 1 - common_suffix) {
             break;
@@ -432,3 +453,23 @@ fn find_common_prefix_suffix(old: &str, new: &gpui_component::Rope) -> (usize, u
 
     (common_prefix, common_suffix)
 }
+
+fn byte_offset_to_lsp_position(text: &str, offset: usize) -> lsp_types::Position {
+    let mut line = 0;
+    let mut character = 0;
+
+    for (byte_idx, c) in text.char_indices() {
+        if byte_idx >= offset {
+            break;
+        }
+        if c == '\n' {
+            line += 1;
+            character = 0;
+        } else {
+            character += c.len_utf16() as u32;
+        }
+    }
+
+    lsp_types::Position { line, character }
+}
+

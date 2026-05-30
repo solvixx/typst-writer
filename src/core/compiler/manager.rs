@@ -85,20 +85,10 @@ impl CompilerManager {
 
     /// Updates the structural hash and re-extracts ranges if needed.
     pub fn update_structural_metadata(&mut self, text: &str) -> bool {
-        // Fast-path: only re-parse if the length changed.
-        // For even more performance, we could add a threshold, but length change is a good start.
-        if text.len() == self.structural_ranges.iter().map(|r| r.len()).sum::<usize>() 
-           && self.structural_hash != 0 
-        {
-            return false;
-        }
-
-        let new_ranges = extract_structural_ranges(text);
-        let new_hash = hash_text_regions(text, &new_ranges);
-        
+        let new_hash = hash_text_regions(text, &self.structural_ranges);
         if new_hash != self.structural_hash {
-            self.structural_ranges = new_ranges;
-            self.structural_hash = new_hash;
+            self.structural_ranges = extract_structural_ranges(text);
+            self.structural_hash = hash_text_regions(text, &self.structural_ranges);
             return true;
         }
         false

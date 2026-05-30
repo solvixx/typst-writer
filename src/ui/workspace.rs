@@ -255,7 +255,7 @@ impl EditorWorkspace {
             let mut cx = cx.clone();
             async move {
                 cx.background_executor()
-                    .timer(Duration::from_millis(300))
+                    .timer(Duration::from_millis(250))
                     .await;
                 this_weak
                     .update(&mut cx, |this, cx| {
@@ -898,7 +898,7 @@ impl EditorWorkspace {
                         self.selection = None;
                     }
                 }
-                self.compile(cx);
+                self.schedule_background_compile(cx);
             }
             EditorAction::Select { range, reversed } => {
                 if is_active {
